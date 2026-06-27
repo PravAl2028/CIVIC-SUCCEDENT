@@ -1,0 +1,1 @@
+{"name":"SUCCEEDEND","description":"A gamified civic infrastructure reporting platform where citizens patrol neighborhoods, scan damage, and earn rewards verified by Gemini AI agents.","requestFramePermissions":["camera","geolocation"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
