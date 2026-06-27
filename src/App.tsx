@@ -1298,6 +1298,7 @@ export default function App() {
             setInitialLeaderboardOpen(true);
             window.location.hash = "community";
           }}
+          onViewMaps={() => { window.location.hash = "maps"; }}
         />
       </div>
 

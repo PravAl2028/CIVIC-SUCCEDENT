@@ -9,9 +9,10 @@ interface LandingViewProps {
   onSignup: () => void;
   onStartMission: () => void;
   onViewLeaderboard: () => void;
+  onViewMaps: () => void;
 }
 
-export default function LandingView({ user, isAuthenticated, onLogin, onSignup, onStartMission, onViewLeaderboard }: LandingViewProps) {
+export default function LandingView({ user, isAuthenticated, onLogin, onSignup, onStartMission, onViewLeaderboard, onViewMaps }: LandingViewProps) {
   return (
     <div className="bg-[#F5F0E8] min-h-screen text-[#191c22] font-sans pb-24">
       {/* Top Banner Navigation */}
@@ -190,7 +191,7 @@ export default function LandingView({ user, isAuthenticated, onLogin, onSignup, 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Safe Navigation Maps Block */}
-            <div className="bg-[#e6f4f2] rounded-3xl p-6 border border-[#006a65]/20 shadow-sm flex flex-col justify-between min-h-[220px] transition-all hover:shadow-md group cursor-pointer hover:border-[#006a65]/40" onClick={isAuthenticated ? onStartMission : onSignup}>
+            <div className="bg-[#e6f4f2] rounded-3xl p-6 border border-[#006a65]/20 shadow-sm flex flex-col justify-between min-h-[220px] transition-all hover:shadow-md group cursor-pointer hover:border-[#006a65]/40" onClick={isAuthenticated ? onViewMaps : onSignup}>
               <div>
                 <span className="bg-[#006a65] text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                   Live Navigation
