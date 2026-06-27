@@ -19,17 +19,24 @@ export default function LandingView({ user, isAuthenticated, onLogin, onSignup, 
       <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-white border-b border-[#d2c5ae]/30 shadow-sm">
         <div 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="font-display text-2xl font-black text-[#775a00] tracking-tighter cursor-pointer"
+          className="font-display text-2xl font-black text-[#775a00] tracking-tighter cursor-pointer whitespace-nowrap flex-shrink-0 mr-4"
         >
           CIVIC SUCCEDENT
         </div>
         {isAuthenticated && user ? (
-          <div className="flex items-center gap-2 bg-[#ecedf6] px-4 py-1.5 rounded-full border border-[#d2c5ae]/20 shadow-sm">
-            <span className="text-xs font-black text-[#775a00] font-mono">{user.xp.toLocaleString()} XP</span>
+          <div className="flex items-center gap-3 bg-[#ecedf6] px-4 py-1.5 rounded-full border border-[#d2c5ae]/20 shadow-sm hover:bg-zinc-100 transition-colors min-w-0">
+            <div className="flex flex-col items-end leading-none min-w-0">
+              <span className="text-xs font-extrabold text-zinc-900 tracking-tight block truncate max-w-[80px] sm:max-w-[150px]">
+                {user.displayName || user.username || "Scout"}
+              </span>
+              <span className="text-[9px] font-black text-[#775a00] font-mono mt-0.5 whitespace-nowrap">
+                {user.xp.toLocaleString()} XP
+              </span>
+            </div>
             <img
               src={user.photoURL}
               alt="user avatar"
-              className="w-6 h-6 rounded-full border-2 border-white object-cover"
+              className="w-7 h-7 rounded-full border-2 border-white object-cover shadow-inner flex-shrink-0"
             />
           </div>
         ) : (

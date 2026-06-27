@@ -29,9 +29,22 @@ function RouteMapEvents({
     click(e) {
       if (clickMode) {
         onSetLocation(e.latlng, clickMode);
+      } else {
+        onSetLocation(e.latlng, "end");
       }
     }
   });
+  return null;
+}
+
+function MapReferenceTracker({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null> }) {
+  const map = useMap();
+  useEffect(() => {
+    mapRef.current = map;
+    return () => {
+      mapRef.current = null;
+    };
+  }, [map, mapRef]);
   return null;
 }
 
@@ -103,24 +116,24 @@ function MapZoomControls() {
 }
 
 // Marker Icon Generators
-const createPinIcon = (letter: string, color: string) => {
+const createTeardropIcon = (color: string) => {
   return L.divIcon({
     html: `
-      <div class="relative flex flex-col items-center">
-        <div class="w-8 h-8 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-white font-bold text-xs ring-4 ring-${color}-500/20" style="background-color: ${color};">
-          ${letter}
-        </div>
-        <div class="w-2 h-2 -mt-1 rotate-45 border-r border-b border-white" style="background-color: ${color};"></div>
+      <div class="relative flex items-center justify-center">
+        <svg width="34" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.35));">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.2" />
+        </svg>
       </div>
     `,
     className: "custom-route-pin",
-    iconSize: [32, 38],
-    iconAnchor: [16, 38]
+    iconSize: [34, 42],
+    iconAnchor: [17, 42]
   });
 };
 
-const startIcon = createPinIcon("A", "#10b981"); // Green for Start
-const endIcon = createPinIcon("B", "#ef4444"); // Red for Destination
+const startIcon = createTeardropIcon("#10b981"); // Green for Start
+const endIcon = createTeardropIcon("#ea4335"); // Google Red for Destination
+
 
 interface RoutePlannerViewProps {
   cases: Case[];
@@ -150,6 +163,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   const [isSearchingEnd, setIsSearchingEnd] = useState(false);
 
   const [clickMode, setClickMode] = useState<"start" | "end" | null>(null);
+  const [isMapSelectionActive, setIsMapSelectionActive] = useState<boolean>(false);
   const [avoidanceEnabled, setAvoidanceEnabled] = useState<boolean>(true);
   const [mapTheme, setMapTheme] = useState<"dark" | "light">("light");
   const isDark = mapTheme === "dark";
@@ -180,6 +194,8 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     preference: string;
     toggle: number;
   } | null>(null);
+
+  const mapRef = useRef<L.Map | null>(null);
 
   // Active Navigation Mode State
   const [isRiding, setIsRiding] = useState<boolean>(false);
@@ -453,6 +469,23 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   };
 
   const handleSetLocation = async (latlng: L.LatLng, mode: "start" | "end") => {
+    if (!latlng) {
+      if (mode === "start") {
+        setStartPoint(null);
+        setStartInput("");
+      } else {
+        setEndPoint(null);
+        setEndInput("");
+      }
+      setClickMode(null);
+      setIsMapSelectionActive(false);
+      return;
+    }
+    
+    // Instantly exit selection mode and hide the fixed center pin overlay
+    setClickMode(null);
+    setIsMapSelectionActive(false);
+    
     if (mode === "start") {
       setStartPoint({ lat: latlng.lat, lng: latlng.lng });
       setStartInput("Resolving address...");
@@ -464,7 +497,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       const address = await fetchReverseGeocode(latlng.lat, latlng.lng);
       setEndInput(address);
     }
-    setClickMode(null);
   };
 
   const toggleAvoidType = (type: DamageType) => {
@@ -697,6 +729,30 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     }
   }, [navCurrentPos, setPlayerPos]);
 
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const lastSpokenInstructionRef = useRef<string>("");
+  useEffect(() => {
+    if (isRiding) {
+      const inst = getActiveTurnInstruction();
+      if (inst && inst !== lastSpokenInstructionRef.current) {
+        // Speak only when it's an action direction (Turn, Detour, Arrival)
+        if (inst.includes("Turn") || inst.includes("detour") || inst.includes("Arriving") || inst.includes("destination")) {
+          speakText(inst);
+          lastSpokenInstructionRef.current = inst;
+        }
+      }
+    } else {
+      lastSpokenInstructionRef.current = "";
+    }
+  }, [navIndex, isRiding]);
+
   // -------------------------------------------------------------
   // ACTIVE RIDE SIMULATOR ENGINE (FOR SECURITY AND RIDER HUD)
   // -------------------------------------------------------------
@@ -844,6 +900,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   };
 
   const handleStopRide = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setIsRiding(false);
     setNavCurrentPos(null);
     if (originalStartPoint) {
@@ -1087,7 +1146,11 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                   <RefreshCw className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
                 ) : (
                   <button 
-                    onClick={() => setClickMode(clickMode === "start" ? null : "start")}
+                    onClick={() => {
+                      const newMode = clickMode === "start" ? null : "start";
+                      setClickMode(newMode);
+                      setIsMapSelectionActive(false);
+                    }}
                     className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       clickMode === "start" 
                         ? "bg-emerald-500 text-white animate-pulse" 
@@ -1148,7 +1211,11 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                   <RefreshCw className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
                 ) : (
                   <button 
-                    onClick={() => setClickMode(clickMode === "end" ? null : "end")}
+                    onClick={() => {
+                      const newMode = clickMode === "end" ? null : "end";
+                      setClickMode(newMode);
+                      setIsMapSelectionActive(false);
+                    }}
                     className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       clickMode === "end" 
                         ? "bg-red-500 text-white animate-pulse" 
@@ -1185,19 +1252,21 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
           </div>
         </div>
 
-        <motion.div 
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 300 }}
-          dragElastic={0.2}
-          className="pointer-events-auto absolute md:relative bottom-[72px] md:bottom-0 left-0 right-0 z-10 bg-white rounded-t-3xl md:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.15)] md:shadow-none md:flex-1 flex flex-col md:h-full w-full md:w-auto flex-shrink-0 touch-none md:touch-pan-x"
-        >
-            {/* Drag Handle purely visual on mobile to indicate it overlaps */}
-            <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 w-full flex justify-center pt-3 pb-2 md:hidden flex-shrink-0 cursor-grab active:cursor-grabbing">
-              <div className="w-12 h-1.5 bg-zinc-300 rounded-full" />
-            </div>
-            
-            {/* Inner Content scrollable */}
-            <div className="overflow-y-auto custom-scrollbar flex-1 pb-4 md:pb-0 max-h-[60vh] md:max-h-none touch-none md:touch-auto">
+        {!clickMode && (
+          <motion.div 
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 300 }}
+            dragElastic={0.2}
+            className="pointer-events-auto absolute md:relative bottom-[72px] md:bottom-0 left-0 right-0 z-10 bg-white rounded-t-3xl md:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.15)] md:shadow-none md:flex-1 flex flex-col md:h-full w-full md:w-auto flex-shrink-0 touch-none md:touch-pan-x"
+          >
+              {/* Drag Handle purely visual on mobile to indicate it overlaps */}
+              <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 w-full flex justify-center pt-3 pb-2 md:hidden flex-shrink-0 cursor-grab active:cursor-grabbing">
+                <div className="w-12 h-1.5 bg-zinc-300 rounded-full" />
+              </div>
+              
+              {/* Inner Content scrollable */}
+              <div className="overflow-y-auto custom-scrollbar flex-1 pb-4 md:pb-0 max-h-[60vh] md:max-h-none touch-none md:touch-auto">
+
               {/* Avoidance Checklist */}
             <div className="p-4 bg-zinc-50 border-b border-[#d2c5ae]/20">
               <div className="flex items-center justify-between mb-3">
@@ -1429,17 +1498,78 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             )}
             </div>
         </motion.div>
+        )}
       </div>
     )}
 
       {/* FULL WIDTH ROAD-LEGAL INTERACTIVE MAP */}
       <div className={`absolute inset-0 z-0 md:relative md:order-none ${isRiding ? "md:h-full md:flex-1" : "md:flex-1 w-full md:w-auto border-zinc-200"}`}>
         
-        {/* Click banner */}
+        {/* Map selection hint banner */}
         {clickMode && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-zinc-900/95 border border-zinc-800/80 backdrop-blur-md px-4 py-2 rounded-full text-white text-[11px] font-bold flex items-center gap-2 shadow-2xl whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span>Click on map to place {clickMode === "start" ? "Starting Location" : "Destination point"}</span>
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-zinc-950/95 border border-zinc-800 backdrop-blur-md px-4 py-2.5 rounded-full text-white text-[11px] font-bold flex items-center gap-2 shadow-2xl whitespace-nowrap animate-bounce">
+            <span className="w-2 h-2 rounded-full bg-[#ea4335] animate-ping" />
+            <span>Tapping map or clicking "Drop Pin" will set location</span>
+          </div>
+        )}
+
+        {/* Fixed Center Pin for Selection Mode */}
+        {clickMode && (
+          <div 
+            className="absolute top-1/2 left-1/2 z-[1000] pointer-events-none flex flex-col items-center"
+            style={{ transform: "translate(-50%, -100%)" }}
+          >
+            <svg width="38" height="46" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: "drop-shadow(0px 4px 6px rgba(0,0,0,0.35))" }}>
+              <path 
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" 
+                fill={clickMode === "start" ? "#10b981" : "#ea4335"} 
+                stroke="#ffffff" 
+                strokeWidth="1.2" 
+              />
+            </svg>
+            {/* Small shadow dot under the pin tip */}
+            <div className="w-2 h-1 bg-black/40 rounded-full blur-[1px] mt-0.5" />
+          </div>
+        )}
+
+        {/* Independent Floating Selection Mode Action Bar */}
+        {clickMode && (
+          <div className="absolute bottom-[88px] left-4 right-4 md:left-4 md:right-auto md:w-[358px] z-[1000] bg-zinc-950/95 border border-zinc-800 text-white rounded-2xl p-4 flex items-center justify-between shadow-2xl backdrop-blur-md pointer-events-auto transition-all duration-300">
+            <div className="flex flex-col min-w-0 flex-1 mr-3">
+              <span className="text-[8px] uppercase font-black text-zinc-400 tracking-wider">
+                Pin Selection Mode
+              </span>
+              <span className="text-xs font-bold truncate mt-0.5 flex items-center gap-1.5">
+                {clickMode === "start" ? "📍 Selecting Start Location" : "🚩 Selecting Destination"}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (mapRef.current) {
+                    const center = mapRef.current.getCenter();
+                    handleSetLocation(center, clickMode);
+                  }
+                }}
+                className="bg-[#ea4335] hover:bg-[#d93025] text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
+              >
+                Drop Pin
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setClickMode(null);
+                  setIsMapSelectionActive(false);
+                }}
+                className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-750 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer border border-zinc-750"
+                title="Cancel Selection"
+              >
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1489,6 +1619,8 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             navActive={isRiding} 
             navCurrentPos={navCurrentPos} 
           />
+          
+          <MapReferenceTracker mapRef={mapRef} />
           
           <RouteMapEvents clickMode={clickMode} onSetLocation={handleSetLocation} />
 
@@ -1731,10 +1863,10 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
               <button
                 type="button"
                 onClick={handleStopRide}
-                className="w-11 h-11 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-700 transition-colors shadow-sm cursor-pointer"
+                className="w-11 h-11 rounded-full bg-red-600 hover:bg-red-700 active:scale-95 flex items-center justify-center text-white transition-all shadow-md cursor-pointer border border-red-500"
                 title="Stop Navigation"
               >
-                <X className="w-5 h-5 stroke-[2.5]" />
+                <X className="w-5 h-5 stroke-[3]" />
               </button>
 
               <div className="text-center">
@@ -1759,6 +1891,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             </div>
           </>
         )}
+
       </div>
 
       {rideCompleted && (

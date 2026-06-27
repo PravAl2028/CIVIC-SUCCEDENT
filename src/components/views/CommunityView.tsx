@@ -299,7 +299,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
   });
 
   return (
-    <div className="bg-[#F5F0E8] text-[#191c22] font-sans h-screen flex flex-col max-w-lg mx-auto relative overflow-hidden pt-20 pb-[54px] px-6">
+    <div className="bg-[#F5F0E8] text-[#191c22] font-sans h-[100dvh] flex flex-col max-w-lg mx-auto relative overflow-hidden pt-20 pb-[72px] px-6">
       <header className="bg-white border-b border-zinc-200 py-3.5 px-4 flex flex-col gap-2.5 shadow-sm -mx-6 -mt-20 mb-2 shrink-0 relative z-30 animate-in fade-in duration-200">
         {/* Row 1: Title and Icon Actions */}
         <div className="flex items-center justify-between w-full gap-2">

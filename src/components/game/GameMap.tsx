@@ -379,17 +379,7 @@ export default function GameMap({
         )}
       </MapContainer>
 
-      {/* Floating Map HUD Control Elements */}
-      <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 pointer-events-auto">
-        <button
-          onClick={handleLocateUser}
-          disabled={isLocating}
-          className="bg-zinc-900/90 hover:bg-zinc-800 text-yellow-400 p-3 rounded-full border border-zinc-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          title="Track Live GPS Location"
-        >
-          <Locate className={`w-5 h-5 ${isLocating ? "animate-spin text-emerald-400" : ""}`} />
-        </button>
-      </div>
+      {/* Floating Map HUD Control Elements removed as requested */}
 
 
     </div>

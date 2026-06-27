@@ -221,6 +221,10 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (!authUser) {
         setAuthUser(null);
+        setUser(null);
+        setHood(null);
+        setPlayerPos({ lat: 20.5937, lng: 78.9629 });
+        setSelectedCaseIdFromChat(null);
         const hash = window.location.hash.replace("#", "").replace("/", "");
         if (hash !== "login" && hash !== "signup") {
           window.location.replace("#");
@@ -1245,7 +1249,7 @@ export default function App() {
   const isUnauthLanding = view === "landing" && !authUser;
   if (initialLoading || (!isAuthView && !isUnauthLanding && (!user || !hood))) {
     return (
-      <div className="bg-[#F5F0E8] min-h-screen font-sans flex flex-col justify-center items-center text-[#191c22]">
+      <div className="bg-[#F5F0E8] min-h-[100dvh] font-sans flex flex-col justify-center items-center text-[#191c22]">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#006a65] border-t-transparent rounded-full animate-spin mx-auto" />
           <h2 className="font-display text-xl font-black uppercase tracking-widest text-[#775a00]">
@@ -1258,7 +1262,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-[#F5F0E8] min-h-screen text-[#191c22] font-sans overflow-x-hidden">
+    <div className="bg-[#F5F0E8] min-h-[100dvh] text-[#191c22] font-sans overflow-x-hidden">
       
       {/* Toast Notification Box */}
       {notification && (
@@ -1305,6 +1309,7 @@ export default function App() {
       {user && hood && (
         <div style={{ display: view === "game" ? "block" : "none" }}>
           <GameView
+            key={`game-${user.userId}`}
             cases={cases}
             user={user}
             hood={hood}
@@ -1327,6 +1332,7 @@ export default function App() {
       {user && (
         <div style={{ display: view === "profile" ? "block" : "none" }}>
           <ProfileView
+            key={`profile-${user.userId}`}
             user={user}
             cases={cases}
             onReset={handleResetApp}
@@ -1341,6 +1347,7 @@ export default function App() {
       {user && hood && (
         <div style={{ display: view === "community" ? "block" : "none" }}>
           <CommunityView
+            key={`community-${user.userId}-${hood.id}`}
             hood={hood}
             leaderboard={leaderboard}
             liveActivities={liveActivities}
@@ -1359,6 +1366,7 @@ export default function App() {
       {user?.isAdmin && (
         <div style={{ display: view === "admin" ? "block" : "none" }}>
           <AdminView
+            key={`admin-${user.userId}`}
             user={user}
             agentModels={agentModels}
             onAgentModelChange={(agent, model) => {
@@ -1374,6 +1382,7 @@ export default function App() {
       {user && (
         <div style={{ display: view === "route_planner" ? "block" : "none" }}>
           <RoutePlannerView
+            key={`route-${user.userId}`}
             cases={cases}
             playerPos={playerPos}
             setPlayerPos={setPlayerPos}
@@ -1623,7 +1632,7 @@ export default function App() {
               setInitialLeaderboardOpen(false);
               window.location.hash = "";
             }}
-            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer flex-1 min-w-0 text-center"
+            className="flex flex-col items-center gap-0.5 text-red-700 hover:text-red-850 cursor-pointer flex-1 min-w-0 text-center transition-colors"
           >
             <ArrowLeft className="w-5 h-5 flex-shrink-0" />
             <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Exit</span>

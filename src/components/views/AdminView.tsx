@@ -246,7 +246,7 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
   const blockedUsers = usersList.filter(u => u.isBlocked && (u.warningsCount || 0) >= 3);
 
   return (
-    <div className="p-6 bg-[#F5F0E8] min-h-screen font-sans pb-24 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 bg-[#F5F0E8] min-h-[100dvh] font-sans pb-32 max-w-4xl mx-auto space-y-6">
       
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-200 pb-4 gap-4">

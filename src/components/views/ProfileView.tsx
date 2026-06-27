@@ -237,6 +237,7 @@ export default function ProfileView({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedAgeCategory, setSelectedAgeCategory] = useState<'kids' | 'teens' | 'adults'>('teens');
+  const [showLevelsPopup, setShowLevelsPopup] = useState(false);
 
   const handleSelectPreset = async (url: string) => {
     if (!auth.currentUser) return;
@@ -270,6 +271,21 @@ export default function ProfileView({
   };
   
   const rankInfo = getRankInfo(user.xp, user.trustScore);
+
+  const rankThresholds = [
+    { rank: "Scout", minXp: 0 },
+    { rank: "Scout Elite", minXp: 500 },
+    { rank: "Patrol Ranger", minXp: 1200 },
+    { rank: "Ranger Captain", minXp: 2200 },
+    { rank: "City Guardian", minXp: 3500 },
+    { rank: "Guardian Commander", minXp: 5000 },
+    { rank: "Champion", minXp: 7000 },
+    { rank: "Legend", minXp: 10000 }
+  ];
+  const currentIndex = rankThresholds.findIndex(r => r.rank === rankInfo.currentRank);
+  const next1 = currentIndex !== -1 && currentIndex + 1 < rankThresholds.length ? rankThresholds[currentIndex + 1] : null;
+  const next2 = currentIndex !== -1 && currentIndex + 2 < rankThresholds.length ? rankThresholds[currentIndex + 2] : null;
+
   
   const getLevelFromXp = (xp: number): number => {
     if (xp >= 10000) return 8;
@@ -389,7 +405,7 @@ export default function ProfileView({
   const history = rewards.filter(r => r.scratched && (r.couponRedeemed || !r.coupon));
 
   return (
-    <div className="bg-[#F5F0E8] min-h-screen text-[#191c22] font-sans pt-20 pb-28 px-6 max-w-lg mx-auto space-y-6">
+    <div className="bg-[#F5F0E8] min-h-[100dvh] text-[#191c22] font-sans pt-20 pb-36 px-6 max-w-lg mx-auto space-y-6">
       
       {/* Profile Header Block */}
       <section className="flex flex-col items-center text-center bg-white p-6 rounded-3xl border border-[#d2c5ae]/30 shadow-sm relative overflow-hidden">
@@ -421,12 +437,43 @@ export default function ProfileView({
         </h2>
         <p className="text-xs text-zinc-400 font-medium mt-1">Member since {memberSince}</p>
 
-        <div className="mt-4 flex items-center gap-2 bg-[#F5F0E8] px-4 py-2 rounded-xl border border-zinc-150">
-          <span className="text-xs font-black text-[#775a00] font-mono">LVL {level}</span>
-          <div className="w-24 h-2.5 bg-zinc-200 rounded-full overflow-hidden">
-            <div className="h-full bg-[#f0c040] rounded-full" style={{ width: `${Math.min(100, progressPercent)}%` }} />
+        <div 
+          onClick={() => setShowLevelsPopup(!showLevelsPopup)}
+          className="mt-4 flex flex-col items-center gap-1.5 bg-[#F5F0E8] px-4 py-2.5 rounded-xl border border-zinc-200 cursor-pointer hover:bg-zinc-200/50 active:scale-[0.99] transition-all w-full max-w-[240px]"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-[#775a00] font-mono">LVL {level}</span>
+            <div className="w-24 h-2.5 bg-zinc-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#f0c040] rounded-full" style={{ width: `${Math.min(100, progressPercent)}%` }} />
+            </div>
+          </div>
+          <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">
+            {rankInfo.xpNeeded.toLocaleString()} XP to reach {rankInfo.nextRank || "Legend"}
           </div>
         </div>
+
+        {showLevelsPopup && (
+          <div className="mt-3.5 p-3.5 bg-[#F5F0E8] border border-zinc-200 rounded-2xl space-y-2 animate-in fade-in slide-in-from-top-2 duration-150 w-full text-left">
+            <div className="font-extrabold text-[#775a00] uppercase text-[8px] tracking-wider mb-1">
+              Upcoming Scout Ranks
+            </div>
+            {next1 && (
+              <div className="flex justify-between items-center text-zinc-750 font-bold text-xs">
+                <span className="flex items-center gap-1.5">🎯 {next1.rank}</span>
+                <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-zinc-200">{next1.minXp} XP</span>
+              </div>
+            )}
+            {next2 ? (
+              <div className="flex justify-between items-center text-zinc-400 font-semibold text-xs border-t border-zinc-200 pt-2 mt-2">
+                <span className="flex items-center gap-1.5">🔒 {next2.rank}</span>
+                <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-zinc-200">🔒 {next2.minXp} XP</span>
+              </div>
+            ) : (
+              <div className="text-[9px] text-zinc-400 italic">No further ranks after this.</div>
+            )}
+          </div>
+        )}
+
 
         {showAvatarSelector && (
           <div className="mt-6 p-4 bg-[#F5F0E8] rounded-2xl border border-zinc-150 w-full text-left space-y-4 animate-in slide-in-from-top-4 duration-250">
@@ -533,25 +580,6 @@ export default function ProfileView({
             </div>
           </div>
         )}
-      </section>
-
-      {/* Level / Rank Target Bar */}
-      <section className="bg-white rounded-3xl p-6 border border-[#d2c5ae]/30 shadow-sm">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-widest">
-            Next Rank: {rankInfo.nextRank || "Legend"}
-          </span>
-          <span className="text-xs font-bold text-[#775a00] font-mono">{rankInfo.xpNeeded.toLocaleString()} XP remaining</span>
-        </div>
-        <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-yellow-400 to-[#f0c040] rounded-full transition-all duration-1000"
-            style={{ width: `${rankInfo.progressPercent}%` }}
-          />
-        </div>
-        <p className="text-[10px] italic text-zinc-400 mt-2">
-          Complete more verification or submit repairs to unlock rank bonuses!
-        </p>
       </section>
 
       {/* Stats Bento Grid */}

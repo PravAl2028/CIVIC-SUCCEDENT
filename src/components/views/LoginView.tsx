@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
 
 export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSignup: () => void, onGoHome: () => void }) {
   const [email, setEmail] = useState('');
@@ -10,8 +10,36 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    let loginEmail = email.trim();
+    if (!loginEmail.includes('@')) {
+      // Treat as username fallback
+      try {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('username', '==', loginEmail));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0].data();
+          if (userDoc.email) {
+            loginEmail = userDoc.email;
+          } else {
+            setError('User does not have a registered email');
+            return;
+          }
+        } else {
+          setError('Username not found');
+          return;
+        }
+      } catch (dbErr) {
+        console.error("Firestore username lookup error:", dbErr);
+        setError('Error checking username');
+        return;
+      }
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, loginEmail, password);
       // App.tsx auth state listener will handle the rest
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -47,13 +75,13 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Email</label>
+            <label className="block text-xs font-bold text-zinc-600 mb-1">Email or Username</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
-              placeholder="your@email.com"
+              placeholder="your@email.com or username"
               required
             />
           </div>

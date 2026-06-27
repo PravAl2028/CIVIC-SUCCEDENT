@@ -61,6 +61,52 @@ export default function GameView({
   const [isShopExpanded, setIsShopExpanded] = useState(false);
   const [liveAccumulated, setLiveAccumulated] = useState<number>(0);
 
+  const [reporterName, setReporterName] = useState<string>("Loading...");
+  const [verifiersNames, setVerifiersNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!selectedCase) {
+      setReporterName("Loading...");
+      setVerifiersNames([]);
+      return;
+    }
+
+    const fetchUserNames = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../firebase');
+        
+        // Fetch reporter
+        const reporterSnap = await getDoc(doc(db, "users", selectedCase.reportedBy));
+        if (reporterSnap.exists()) {
+          setReporterName(reporterSnap.data()?.username || reporterSnap.data()?.displayName || "Scout");
+        } else {
+          setReporterName("Unknown Scout");
+        }
+
+        // Fetch verifiers
+        if (selectedCase.verifiedBy && selectedCase.verifiedBy.length > 0) {
+          const names: string[] = [];
+          for (const vid of selectedCase.verifiedBy) {
+            const vSnap = await getDoc(doc(db, "users", vid));
+            if (vSnap.exists()) {
+              names.push(vSnap.data()?.username || vSnap.data()?.displayName || "Scout");
+            }
+          }
+          setVerifiersNames(names);
+        } else {
+          setVerifiersNames([]);
+        }
+      } catch (err) {
+        console.error("Error fetching usernames for case:", err);
+        setReporterName("Scout");
+        setVerifiersNames([]);
+      }
+    };
+
+    fetchUserNames();
+  }, [selectedCase]);
+
   // Listen for case selection from chat redirection
   useEffect(() => {
     if (selectedCaseIdFromChat) {
@@ -159,7 +205,7 @@ export default function GameView({
   };
 
   return (
-    <div className="relative w-full h-screen bg-zinc-950 text-white font-sans overflow-hidden">
+    <div className="relative w-full h-[100dvh] bg-zinc-950 text-white font-sans overflow-hidden">
       
       {/* Background Live Map Grid */}
       <div className="absolute inset-0 w-full h-full">
@@ -181,7 +227,7 @@ export default function GameView({
           placingBuildingType={placingBuildingType}
           onSelectCase={(c) => {
             setSelectedCase(c);
-            setShowFullModal(false);
+            setShowFullModal(true);
           }}
         />
       </div>
@@ -193,7 +239,10 @@ export default function GameView({
           <div className="flex justify-between items-center w-full gap-2 pointer-events-auto">
             {/* HUD Left: Compact Profile Stats */}
             <div className="flex items-center gap-2 min-w-0">
-              <div className="bg-zinc-950/90 backdrop-blur-md px-2 py-1.5 md:px-3 md:py-2 rounded-2xl border border-zinc-800/80 shadow-2xl flex items-center gap-1.5 md:gap-2.5 min-w-0 max-w-[45vw] md:max-w-none">
+              <div 
+                onClick={() => { window.location.hash = "profile"; }}
+                className="bg-zinc-950/90 backdrop-blur-md px-2 py-1.5 md:px-3 md:py-2 rounded-2xl border border-zinc-800/80 shadow-2xl flex items-center gap-1.5 md:gap-2.5 min-w-0 max-w-[45vw] md:max-w-none cursor-pointer hover:bg-zinc-900/90 transition-colors"
+              >
                 <img
                   src={user.photoURL}
                   alt="user avatar"
@@ -839,6 +888,22 @@ export default function GameView({
               <p className="text-[11px] text-zinc-300 leading-relaxed max-h-24 overflow-y-auto pr-1">
                 {selectedCase.description || "No description provided."}
               </p>
+
+              {/* Reporter & Verifiers Info */}
+              <div className="text-[9px] text-zinc-400 font-mono space-y-1 bg-zinc-950 border border-zinc-850 p-2.5 rounded-2xl">
+                <div>
+                  <span className="font-bold text-zinc-500 uppercase">Reporter: </span>
+                  <span className="text-zinc-300 font-bold">{reporterName}</span>{" "}
+                  <span className="text-yellow-500 font-black font-sans">(+50-500 XP, +50-500 Coins)</span>
+                </div>
+                {verifiersNames.length > 0 && (
+                  <div>
+                    <span className="font-bold text-zinc-500 uppercase">Verifiers: </span>
+                    <span className="text-zinc-300 font-bold">{verifiersNames.join(", ")}</span>{" "}
+                    <span className="text-teal-400 font-black font-sans">(+30 XP, +50 Coins)</span>
+                  </div>
+                )}
+              </div>
 
               {/* Severity & Metadata Grid */}
               <div className="grid grid-cols-2 gap-2 bg-zinc-950 border border-zinc-850 p-2.5 rounded-2xl">
