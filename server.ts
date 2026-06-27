@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
@@ -20,6 +21,9 @@ const PORT = 3000;
 
 async function startServer() {
   const app = express();
+  
+  // Enable Cross-Origin Resource Sharing (CORS)
+  app.use(cors());
   
   // Configure body parser with high limit for base64 image uploads
   app.use(express.json({ limit: "50mb" }));
