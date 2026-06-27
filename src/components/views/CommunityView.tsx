@@ -10,12 +10,13 @@ interface CommunityViewProps {
   liveActivities?: any;
   user: any;
   moderatorModel?: string;
+  initialLeaderboardOpen?: boolean;
   onViewCaseOnMap?: (caseId: string, lat: number, lng: number) => void;
 }
 
 const API_BASE = (import.meta as any).env.VITE_API_URL || "";
 
-export default function CommunityView({ hood, user, moderatorModel, onViewCaseOnMap }: CommunityViewProps) {
+export default function CommunityView({ hood, user, moderatorModel, initialLeaderboardOpen, onViewCaseOnMap }: CommunityViewProps) {
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, { username: string; avatarUrl?: string; isAdmin?: boolean; rank?: string; area?: string }>>({});
   const [selectedArea, setSelectedArea] = useState<string>("All Areas");
@@ -27,7 +28,7 @@ export default function CommunityView({ hood, user, moderatorModel, onViewCaseOn
   const [chatLoading, setChatLoading] = useState(false);
 
   // Redesign state
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(initialLeaderboardOpen || false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isFabExpanded, setIsFabExpanded] = useState(false);
@@ -123,6 +124,12 @@ export default function CommunityView({ hood, user, moderatorModel, onViewCaseOn
       unsubMessages();
     };
   }, [hood?.id]);
+
+  useEffect(() => {
+    if (initialLeaderboardOpen !== undefined) {
+      setIsLeaderboardOpen(initialLeaderboardOpen);
+    }
+  }, [initialLeaderboardOpen]);
 
   // Simple time-ago formatter
   const timeAgo = (dateStr: string) => {

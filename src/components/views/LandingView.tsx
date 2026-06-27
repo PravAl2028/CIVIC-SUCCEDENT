@@ -181,6 +181,54 @@ export default function LandingView({ user, isAuthenticated, onLogin, onSignup, 
           </div>
         </section>
 
+        {/* Advanced Mission Suite Section */}
+        <section className="w-full mt-16 text-left space-y-6">
+          <h2 className="font-display text-2xl font-black uppercase text-zinc-900 border-b-2 border-zinc-200 pb-2 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 bg-[#006a65] rounded-full" />
+            ADVANCED MISSION SUITE
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Safe Navigation Maps Block */}
+            <div className="bg-[#e6f4f2] rounded-3xl p-6 border border-[#006a65]/20 shadow-sm flex flex-col justify-between min-h-[220px] transition-all hover:shadow-md group cursor-pointer hover:border-[#006a65]/40" onClick={isAuthenticated ? onStartMission : onSignup}>
+              <div>
+                <span className="bg-[#006a65] text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  Live Navigation
+                </span>
+                <h3 className="font-display text-xl font-bold mt-4 text-zinc-900 flex items-center gap-2">
+                  Safe Navigation Maps
+                  <ArrowRight className="w-4 h-4 text-[#006a65] transition-transform group-hover:translate-x-1" />
+                </h3>
+                <p className="text-xs text-[#4e4635] mt-2 leading-relaxed">
+                  Plan bypass routes dynamically. Our system uses real-time OSRM calculations to design routes that automatically steer you away from active potholes, waterlogging, and dark zones with full audio guidance.
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-1.5 text-xs font-black text-[#006a65] uppercase tracking-wider font-mono">
+                <span>⚡ Active Detour Engine</span>
+              </div>
+            </div>
+
+            {/* Community & Leaderboard Block */}
+            <div className="bg-white rounded-3xl p-6 border border-[#d2c5ae]/30 shadow-sm flex flex-col justify-between min-h-[220px] transition-all hover:shadow-md group cursor-pointer" onClick={isAuthenticated ? onViewLeaderboard : onSignup}>
+              <div>
+                <span className="bg-[#775a00]/10 text-[#775a00] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  Social Hub
+                </span>
+                <h3 className="font-display text-xl font-bold mt-4 text-zinc-900 flex items-center gap-2">
+                  Scout Community & Leaderboard
+                  <ArrowRight className="w-4 h-4 text-[#775a00] transition-transform group-hover:translate-x-1" />
+                </h3>
+                <p className="text-xs text-[#4e4635] mt-2 leading-relaxed">
+                  Join the local neighborhood chat monitored by our AI Moderator Agent. View the real-time leaderboard of municipal scouts, compete for top ranks, and claim victory cards.
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-1.5 text-xs font-black text-[#775a00] uppercase tracking-wider font-mono">
+                <span>🏆 RANK & CONNECT</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CTA Banner */}
         <section className="w-full mt-16 bg-zinc-900 text-white rounded-3xl p-8 relative overflow-hidden text-center flex flex-col items-center justify-center">
           <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none transform translate-x-12 translate-y-12">

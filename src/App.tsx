@@ -91,6 +91,7 @@ const LEVEL_UP_REWARDS_MAP: Record<number, {
 
 export default function App() {
   const [view, setView] = useState<ViewState>("landing");
+  const [initialLeaderboardOpen, setInitialLeaderboardOpen] = useState(false);
 
   const [levelUpData, setLevelUpData] = useState<{
     level: number;
@@ -157,16 +158,81 @@ export default function App() {
 
   const [authUser, setAuthUser] = useState<any>(null);
 
+  // Listen to hash changes for all pages
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (initialLoading) return;
+
+      const hash = window.location.hash.replace("#", "").replace("/", "");
+      
+      let targetView: ViewState = "landing";
+      if (hash === "login") targetView = "login";
+      else if (hash === "signup") targetView = "signup";
+      else if (hash === "onboarding") targetView = "onboarding";
+      else if (hash === "patrol" || hash === "game") targetView = "game";
+      else if (hash === "maps" || hash === "route_planner") targetView = "route_planner";
+      else if (hash === "community") targetView = "community";
+      else if (hash === "profile") targetView = "profile";
+      else if (hash === "admin") targetView = "admin";
+      else if (hash === "scanner_result") targetView = "scanner_result";
+
+      // Auth validation redirect logic
+      if (!auth.currentUser) {
+        if (targetView !== "login" && targetView !== "signup" && targetView !== "landing") {
+          window.location.replace("#");
+          setView("landing");
+          return;
+        }
+      } else {
+        if (targetView === "login" || targetView === "signup") {
+          window.location.replace("#patrol");
+          setView("game");
+          return;
+        }
+        if (targetView === "admin" && !user?.isAdmin) {
+          window.location.replace("#patrol");
+          setView("game");
+          return;
+        }
+      }
+
+      setView(targetView);
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    
+    // Initial parse
+    handleHashChange();
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, [initialLoading, authUser, user]);
+
+  // Handle map resizing layout fixes when active view changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [view]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (!authUser) {
         setAuthUser(null);
-        setView("landing");
+        const hash = window.location.hash.replace("#", "").replace("/", "");
+        if (hash !== "login" && hash !== "signup") {
+          window.location.replace("#");
+          setView("landing");
+        }
         setInitialLoading(false);
       } else {
         setAuthUser(authUser);
+        const hash = window.location.hash.replace("#", "").replace("/", "");
         const userDoc = await getDoc(doc(db, 'users', authUser.uid));
         if (!userDoc.exists()) {
+          window.location.replace("#onboarding");
           setView("onboarding");
           setInitialLoading(false);
         } else {
@@ -180,12 +246,22 @@ export default function App() {
               { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
             );
           }
-          setView("landing");
+          
+          let targetView: ViewState = "game";
+          if (hash === "maps" || hash === "route_planner") targetView = "route_planner";
+          else if (hash === "community") targetView = "community";
+          else if (hash === "profile") targetView = "profile";
+          else if (hash === "admin") targetView = "admin";
+          
+          const targetHash = targetView === "game" ? "patrol" : (targetView === "route_planner" ? "maps" : targetView);
+          window.location.replace(`#${targetHash}`);
+          setView(targetView);
         }
       }
     }, (error) => {
       console.error("Auth state change error:", error);
       setAuthUser(null);
+      window.location.replace("#");
       setView("landing");
       setInitialLoading(false);
     });
@@ -1198,97 +1274,111 @@ export default function App() {
         </div>
       )}
 
-      {view === "login" && (
-        <LoginView onSwitchToSignup={() => setView("signup")} onGoHome={() => setView("landing")} />
-      )}
+      <div style={{ display: view === "login" ? "block" : "none" }}>
+        <LoginView onSwitchToSignup={() => { window.location.replace("#signup"); }} onGoHome={() => { window.location.hash = ""; }} />
+      </div>
 
-      {view === "signup" && (
-        <SignupView onSwitchToLogin={() => setView("login")} onGoHome={() => setView("landing")} />
-      )}
+      <div style={{ display: view === "signup" ? "block" : "none" }}>
+        <SignupView onSwitchToLogin={() => { window.location.replace("#login"); }} onGoHome={() => { window.location.hash = ""; }} />
+      </div>
 
-      {view === "onboarding" && (
-        <OnboardingView onComplete={() => setView("landing")} />
-      )}
+      <div style={{ display: view === "onboarding" ? "block" : "none" }}>
+        <OnboardingView onComplete={() => { window.location.hash = "patrol"; }} />
+      </div>
 
       {/* Main Content Area */}
-      {view === "landing" && (
+      <div style={{ display: view === "landing" ? "block" : "none" }}>
         <LandingView
           user={user}
           isAuthenticated={!!authUser}
-          onLogin={() => setView("login")}
-          onSignup={() => setView("signup")}
-          onStartMission={() => setView("game")}
-          onViewLeaderboard={() => setView("community")}
-        />
-      )}
-
-      {view === "game" && (
-        <GameView
-          cases={cases}
-          user={user}
-          hood={hood}
-          playerPos={playerPos}
-          setPlayerPos={setPlayerPos}
-          onVerifyCase={handleVerifyCase}
-          onResolveCase={handleResolveCase}
-          onTriggerScan={handleTriggerScan}
-          empireBuildings={empire}
-          onCollectIncome={handleCollectIncome}
-          onUpgradeScoutHouse={handleUpgradeScoutHouse}
-          onBuyBuilding={handleBuyBuilding}
-          selectedCaseIdFromChat={selectedCaseIdFromChat}
-          setSelectedCaseIdFromChat={setSelectedCaseIdFromChat}
-          onPinHQ={handleEstablishHQ}
-        />
-      )}
-
-      {view === "profile" && (
-        <ProfileView
-          user={user}
-          cases={cases}
-          onReset={handleResetApp}
-          onScratchSavedCard={(reward) => {
-            setScratchReward(reward);
-            setReturnView("profile");
+          onLogin={() => { window.location.hash = "login"; }}
+          onSignup={() => { window.location.hash = "signup"; }}
+          onStartMission={() => { window.location.hash = "patrol"; }}
+          onViewLeaderboard={() => {
+            setInitialLeaderboardOpen(true);
+            window.location.hash = "community";
           }}
         />
+      </div>
+
+      {user && hood && (
+        <div style={{ display: view === "game" ? "block" : "none" }}>
+          <GameView
+            cases={cases}
+            user={user}
+            hood={hood}
+            playerPos={playerPos}
+            setPlayerPos={setPlayerPos}
+            onVerifyCase={handleVerifyCase}
+            onResolveCase={handleResolveCase}
+            onTriggerScan={handleTriggerScan}
+            empireBuildings={empire}
+            onCollectIncome={handleCollectIncome}
+            onUpgradeScoutHouse={handleUpgradeScoutHouse}
+            onBuyBuilding={handleBuyBuilding}
+            selectedCaseIdFromChat={selectedCaseIdFromChat}
+            setSelectedCaseIdFromChat={setSelectedCaseIdFromChat}
+            onPinHQ={handleEstablishHQ}
+          />
+        </div>
       )}
 
-      {view === "community" && (
-        <CommunityView
-          hood={hood}
-          leaderboard={leaderboard}
-          liveActivities={liveActivities}
-          user={user}
-          moderatorModel={agentModels.moderator}
-          onViewCaseOnMap={(caseId, lat, lng) => {
-            setPlayerPos({ lat, lng });
-            setSelectedCaseIdFromChat(caseId);
-            setView("game");
-          }}
-        />
+      {user && (
+        <div style={{ display: view === "profile" ? "block" : "none" }}>
+          <ProfileView
+            user={user}
+            cases={cases}
+            onReset={handleResetApp}
+            onScratchSavedCard={(reward) => {
+              setScratchReward(reward);
+              setReturnView("profile");
+            }}
+          />
+        </div>
       )}
 
-      {view === "admin" && (
-        <AdminView
-          user={user}
-          agentModels={agentModels}
-          onAgentModelChange={(agent, model) => {
-            const updated = { ...agentModels, [agent]: model };
-            setAgentModels(updated);
-            localStorage.setItem("civic_succedent_agent_models_v2", JSON.stringify(updated));
-            triggerToast(`Model for ${agent.toUpperCase()} Agent set to ${model}!`, "success");
-          }}
-        />
+      {user && hood && (
+        <div style={{ display: view === "community" ? "block" : "none" }}>
+          <CommunityView
+            hood={hood}
+            leaderboard={leaderboard}
+            liveActivities={liveActivities}
+            user={user}
+            moderatorModel={agentModels.moderator}
+            initialLeaderboardOpen={initialLeaderboardOpen}
+            onViewCaseOnMap={(caseId, lat, lng) => {
+              setPlayerPos({ lat, lng });
+              setSelectedCaseIdFromChat(caseId);
+              window.location.hash = "patrol";
+            }}
+          />
+        </div>
       )}
 
-      {view === "route_planner" && (
-        <RoutePlannerView
-          cases={cases}
-          playerPos={playerPos}
-          setPlayerPos={setPlayerPos}
-          onTriggerScan={handleTriggerScan}
-        />
+      {user?.isAdmin && (
+        <div style={{ display: view === "admin" ? "block" : "none" }}>
+          <AdminView
+            user={user}
+            agentModels={agentModels}
+            onAgentModelChange={(agent, model) => {
+              const updated = { ...agentModels, [agent]: model };
+              setAgentModels(updated);
+              localStorage.setItem("civic_succedent_agent_models_v2", JSON.stringify(updated));
+              triggerToast(`Model for ${agent.toUpperCase()} Agent set to ${model}!`, "success");
+            }}
+          />
+        </div>
+      )}
+
+      {user && (
+        <div style={{ display: view === "route_planner" ? "block" : "none" }}>
+          <RoutePlannerView
+            cases={cases}
+            playerPos={playerPos}
+            setPlayerPos={setPlayerPos}
+            onTriggerScan={handleTriggerScan}
+          />
+        </div>
       )}
 
       {view === "scanner_result" && (
@@ -1457,7 +1547,10 @@ export default function App() {
           
           {/* Tab 1: Map/Patrol Grid */}
           <button
-            onClick={() => setView("game")}
+            onClick={() => {
+              setInitialLeaderboardOpen(false);
+              window.location.hash = "patrol";
+            }}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
               view === "game" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
             }`}
@@ -1468,7 +1561,10 @@ export default function App() {
 
           {/* Tab 1.5: Safe Maps Route Planner */}
           <button
-            onClick={() => setView("route_planner")}
+            onClick={() => {
+              setInitialLeaderboardOpen(false);
+              window.location.hash = "maps";
+            }}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
               view === "route_planner" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
             }`}
@@ -1479,7 +1575,10 @@ export default function App() {
 
           {/* Tab 2: Community Portal */}
           <button
-            onClick={() => setView("community")}
+            onClick={() => {
+              setInitialLeaderboardOpen(false);
+              window.location.hash = "community";
+            }}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
               view === "community" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
             }`}
@@ -1490,7 +1589,10 @@ export default function App() {
 
           {/* Tab 3: Scout Profile */}
           <button
-            onClick={() => setView("profile")}
+            onClick={() => {
+              setInitialLeaderboardOpen(false);
+              window.location.hash = "profile";
+            }}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
               view === "profile" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
             }`}
@@ -1501,7 +1603,10 @@ export default function App() {
 
           {user?.isAdmin && (
             <button
-              onClick={() => setView("admin")}
+              onClick={() => {
+                setInitialLeaderboardOpen(false);
+                window.location.hash = "admin";
+              }}
               className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
                 view === "admin" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
               }`}
@@ -1513,7 +1618,10 @@ export default function App() {
 
           {/* Tab 4: Back to landing */}
           <button
-            onClick={() => setView("landing")}
+            onClick={() => {
+              setInitialLeaderboardOpen(false);
+              window.location.hash = "";
+            }}
             className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer flex-1 min-w-0 text-center"
           >
             <ArrowLeft className="w-5 h-5 flex-shrink-0" />

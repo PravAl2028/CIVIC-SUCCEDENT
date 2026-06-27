@@ -716,10 +716,17 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       radius: 15
     }));
 
+    const initialRouteObject = currentPath.length >= 2 ? {
+      line: turf.lineString(currentPath.map(coord => [coord[1], coord[0]])),
+      distanceMeters: stats.distance,
+      durationSeconds: stats.time * 60
+    } : undefined;
+
     const session = createNavigationSession({ 
       destination: [endPoint.lng, endPoint.lat], 
       hazards: mappedHazards, 
       mode: routingPreference,
+      initialRoute: initialRouteObject,
       onProgress: (prog: any) => {
         // Here we could update distance to route if needed
       },
@@ -744,51 +751,48 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     let watchId: number | null = null;
 
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        session.setInitialRoute([pos.coords.longitude, pos.coords.latitude]);
-        watchId = navigator.geolocation.watchPosition(
-          (p) => {
-            const { latitude, longitude, speed: gpsSpeed } = p.coords;
-            console.log("Live GPS Navigation Update:", latitude, longitude);
-            setNavCurrentPos([latitude, longitude]);
-            if (gpsSpeed !== null && gpsSpeed !== undefined) {
-              setSpeed(Math.round(gpsSpeed * 3.6)); // m/s to km/h
+      watchId = navigator.geolocation.watchPosition(
+        (p) => {
+          const { latitude, longitude, speed: gpsSpeed } = p.coords;
+          console.log("Live GPS Navigation Update:", latitude, longitude);
+          setNavCurrentPos([latitude, longitude]);
+          if (gpsSpeed !== null && gpsSpeed !== undefined) {
+            setSpeed(Math.round(gpsSpeed * 3.6)); // m/s to km/h
+          }
+
+          // Calculate distance to end destination
+          const distToEnd = haversineDistance(latitude, longitude, endPoint.lat, endPoint.lng);
+          if (distToEnd < 20) { // arrived within 20 meters!
+            setIsRiding(false);
+            setRideCompleted(true);
+            const earnedPoints = 150 + encounteredHazards.length * 50;
+            setRideXP(earnedPoints);
+            setRideSP(earnedPoints);
+            speakText("Congratulations! You have arrived at your destination safely. Safe rider bonus issued.");
+          }
+
+          // Proximity alerts for active hazards on the map
+          activeHazards.forEach(h => {
+            const dist = haversineDistance(latitude, longitude, h.latitude, h.longitude);
+            if (dist < 80) {
+              const typeLabel = h.damageType.replace("_", " ");
+              // simple throttle missing here, but retaining original logic
+              // speakText(`Warning! Approaching active municipal ${typeLabel} within eighty meters.`);
             }
+          });
 
-            // Calculate distance to end destination
-            const distToEnd = haversineDistance(latitude, longitude, endPoint.lat, endPoint.lng);
-            if (distToEnd < 20) { // arrived within 20 meters!
-              setIsRiding(false);
-              setRideCompleted(true);
-              const earnedPoints = 150 + encounteredHazards.length * 50;
-              setRideXP(earnedPoints);
-              setRideSP(earnedPoints);
-              speakText("Congratulations! You have arrived at your destination safely. Safe rider bonus issued.");
-            }
-
-            // Proximity alerts for active hazards on the map
-            activeHazards.forEach(h => {
-              const dist = haversineDistance(latitude, longitude, h.latitude, h.longitude);
-              if (dist < 80) {
-                const typeLabel = h.damageType.replace("_", " ");
-                // simple throttle missing here, but retaining original logic
-                // speakText(`Warning! Approaching active municipal ${typeLabel} within eighty meters.`);
-              }
-            });
-
-            session.onPositionUpdate({
-              lat: latitude,
-              lng: longitude,
-              timestamp: p.timestamp,
-            });
-          },
-          (err) => {
-            console.error("GPS Watch Position Error:", err);
-            speakText("GPS tracking signal lost. Please check your device location settings.");
-          },
-          { enableHighAccuracy: true, maximumAge: 1000 }
-        );
-      });
+          session.onPositionUpdate({
+            lat: latitude,
+            lng: longitude,
+            timestamp: p.timestamp,
+          });
+        },
+        (err) => {
+          console.error("GPS Watch Position Error:", err);
+          speakText("GPS tracking signal lost. Please check your device location settings.");
+        },
+        { enableHighAccuracy: true, maximumAge: 1000 }
+      );
     } else {
       speakText("Geolocation tracking is not supported by your browser.");
     }
@@ -827,20 +831,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     setOriginalStartPoint(startPoint);
     setOriginalStartInput(startInput);
 
-    // Visually bridge the gap immediately so the map doesn't look empty
-    if (roadRoute.length > 0) {
-      setRoadRoute(prev => [[playerPos.lat, playerPos.lng], ...prev]);
-    }
-    if (safeRoadRoute.length > 0) {
-      setSafeRoadRoute(prev => [[playerPos.lat, playerPos.lng], ...prev]);
-    }
-
-    // Update start point to current GPS location before riding
-    setStartPoint({ lat: playerPos.lat, lng: playerPos.lng });
-    fetchReverseGeocode(playerPos.lat, playerPos.lng).then(address => {
-      setStartInput(address || "My Current Location");
-    });
-
     setNavIndex(0);
     setRideCompleted(false);
     setRideXP(0);
@@ -860,6 +850,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       setStartPoint(originalStartPoint);
       setStartInput(originalStartInput);
     }
+    // Clear last fetched params reference and increment toggle to force a clean recalculation from the selected startPoint to endPoint
+    lastFetchedParamsRef.current = null;
+    setForceFetchToggle(prev => prev + 1);
     speakText("Navigation ride stopped.");
   };
 
@@ -882,6 +875,8 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     setEndInput("");
     setRoadRoute([]);
     setSafeRoadRoute([]);
+    // Clear last fetched params reference to ensure fresh state
+    lastFetchedParamsRef.current = null;
     setIsRiding(false);
     setNavCurrentPos(null);
     setNavIndex(0);
@@ -1701,7 +1696,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             </div>
 
             {/* 2. FLOATING SPEEDOMETER (BOTTOM LEFT OVERLAY) */}
-            <div className="absolute bottom-28 left-4 z-[1000] flex flex-col gap-1.5 items-center">
+            <div className="absolute bottom-[164px] left-4 z-[1000] flex flex-col gap-1.5 items-center">
               <div className="w-16 h-16 bg-white/95 backdrop-blur border border-zinc-200 shadow-2xl rounded-full flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
                 <span className="text-xl font-black text-zinc-800 leading-none">{speed}</span>
                 <span className="text-[8px] font-bold text-zinc-400 tracking-widest uppercase mt-0.5">km/h</span>
@@ -1732,7 +1727,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             </div>
 
             {/* 5. BOTTOM NAVIGATION TRAVEL STATUS CARD */}
-            <div className="absolute bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md lg:max-w-lg z-[1000] bg-white text-zinc-900 shadow-2xl rounded-3xl p-4 flex items-center justify-between border border-zinc-100 transition-all animate-in slide-in-from-bottom duration-300">
+            <div className="absolute bottom-[80px] left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md lg:max-w-lg z-[1000] bg-white text-zinc-900 shadow-2xl rounded-3xl p-4 flex items-center justify-between border border-zinc-100 transition-all animate-in slide-in-from-bottom duration-300">
               <button
                 type="button"
                 onClick={handleStopRide}

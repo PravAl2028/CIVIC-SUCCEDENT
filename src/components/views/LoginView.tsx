@@ -14,10 +14,15 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
       await signInWithEmailAndPassword(auth, email, password);
       // App.tsx auth state listener will handle the rest
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found') setError('No account with this email');
-      else if (err.code === 'auth/wrong-password') setError('Incorrect password');
-      else if (err.code === 'auth/invalid-email') setError('Invalid email format');
-      else setError(err.message || 'Login failed');
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please try again.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email format');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many unsuccessful login attempts. Please try again later.');
+      } else {
+        setError(err.message?.replace('Firebase: ', '') || 'Login failed. Please check your credentials.');
+      }
     }
   };
 

@@ -32,8 +32,9 @@ export function createNavigationSession({
   onProgress,
   onRerouted,
   onError,
+  initialRoute,
 } = {}) {
-  let route = null;
+  let route = initialRoute || null;
   let lastProcessedAt = -Infinity;
   let deviatedSinceMs = null;
   let lastRerouteAt = -Infinity;
