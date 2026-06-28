@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { 
-  Navigation, Camera, AlertOctagon, HelpCircle, ShieldCheck, Zap, Sun, Moon, 
+  Navigation, Camera, AlertOctagon, AlertTriangle, HelpCircle, ShieldCheck, Zap, Sun, Moon, 
   Coins, Landmark, ChevronUp, ChevronDown, CheckCircle2, Hammer, ArrowRight, X, Sparkles
 } from "lucide-react";
 import GameMap, { getMarkerBg } from "../game/GameMap";
@@ -537,19 +537,36 @@ export default function GameView({
 
       {/* Geolocation Warning Banner */}
       {gpsError && patrolMode === "patrol" && (
-        <div className="absolute top-28 left-3 right-3 z-30 bg-red-950/95 border border-red-500/30 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md text-red-200 text-[10px] max-w-sm mx-auto">
-          <div className="flex justify-between items-start mb-1">
-            <span className="font-extrabold text-xs text-red-400 flex items-center gap-1.5">
-              ⚠️ Geolocation Unavailable
-            </span>
-            <button 
-              onClick={() => setGpsError(null)}
-              className="text-red-400 hover:text-white font-bold text-xs cursor-pointer"
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-zinc-950/95 border border-zinc-800 p-5 rounded-2xl shadow-2xl backdrop-blur-md text-center max-w-[280px] w-full">
+          <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-2 animate-pulse" />
+          <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide uppercase">Location Access Required</h3>
+          <p className="text-[10px] text-zinc-400 mb-4 leading-relaxed">{gpsError}</p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setGpsError(null);
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      setPlayerPos({ lat: position.coords.latitude, lng: position.coords.longitude });
+                    },
+                    (err) => {
+                      console.error("GPS retry error:", err);
+                      let errMsg = "GPS signal unavailable.";
+                      if (err.code === err.PERMISSION_DENIED) {
+                        errMsg = "Location tracking permission was denied by the browser.";
+                      }
+                      setGpsError(errMsg);
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                  );
+                }
+              }}
+              className="w-full bg-[#006a65] text-white font-extrabold text-xs uppercase tracking-wider py-3 rounded-xl hover:bg-teal-700 active:scale-95 transition-all cursor-pointer shadow-md"
             >
-              [Dismiss]
+              Retry GPS Access
             </button>
           </div>
-          <p className="leading-relaxed opacity-90">{gpsError}</p>
         </div>
       )}
 
