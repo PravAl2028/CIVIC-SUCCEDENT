@@ -16,25 +16,25 @@ interface PresetAvatar {
 const PRESET_AVATARS: PresetAvatar[] = [
   // Kids - Girls
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Lily&mouth=smile&top=longHair&hairColor=blonde",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Lily&top=bob",
     category: "kids",
     gender: "girl",
     name: "Lily"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Chloe&mouth=twinkle&top=buns&hairColor=auburn",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Chloe&top=curly",
     category: "kids",
     gender: "girl",
     name: "Chloe"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Zoe&mouth=smile&top=bob&hairColor=black",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Zoe&top=bob",
     category: "kids",
     gender: "girl",
     name: "Zoe"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sophie&mouth=smile&top=ponytail&hairColor=brown",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sophie&top=curvy",
     category: "kids",
     gender: "girl",
     name: "Sophie"
@@ -42,25 +42,25 @@ const PRESET_AVATARS: PresetAvatar[] = [
 
   // Kids - Boys
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Toby&mouth=smile&top=shortHair&hairColor=brown",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Toby&top=shortRound",
     category: "kids",
     gender: "boy",
     name: "Toby"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Leo&mouth=tongueOut&top=frizzle&hairColor=black",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Leo&top=shortCurly",
     category: "kids",
     gender: "boy",
     name: "Leo"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Milo&mouth=smile&top=shaggy&hairColor=blonde",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Milo&top=shaggy",
     category: "kids",
     gender: "boy",
     name: "Milo"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Oliver&mouth=smile&top=shortFlat&hairColor=auburn",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Oliver&top=shortFlat",
     category: "kids",
     gender: "boy",
     name: "Oliver"
@@ -68,25 +68,25 @@ const PRESET_AVATARS: PresetAvatar[] = [
 
   // Teens - Girls
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Maya&top=straight02&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Maya&top=straight02",
     category: "teens",
     gender: "girl",
     name: "Maya"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Aria&top=curly&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Aria&top=curly",
     category: "teens",
     gender: "girl",
     name: "Aria"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Mia&top=sides&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Mia&top=sides",
     category: "teens",
     gender: "girl",
     name: "Mia"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Bella&top=longHairCurly&accessories=round&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Bella&top=bigHair&accessories=round",
     category: "teens",
     gender: "girl",
     name: "Bella"
@@ -94,25 +94,25 @@ const PRESET_AVATARS: PresetAvatar[] = [
 
   // Teens - Boys
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Jack&top=shortFlat&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Jack&top=shortFlat",
     category: "teens",
     gender: "boy",
     name: "Jack"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sam&top=curly&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sam&top=curly",
     category: "teens",
     gender: "boy",
     name: "Sam"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Ryan&top=shaggy&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Ryan&top=shaggy",
     category: "teens",
     gender: "boy",
     name: "Ryan"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Tyler&top=shortWaved&facialHairProbability=0",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Tyler&top=shortWaved",
     category: "teens",
     gender: "boy",
     name: "Tyler"
@@ -126,7 +126,7 @@ const PRESET_AVATARS: PresetAvatar[] = [
     name: "Emma"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sophia&top=longHairCurly&accessories=prescription02",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sophia&top=curly&accessories=prescription02",
     category: "adults",
     gender: "girl",
     name: "Sophia"
@@ -138,7 +138,7 @@ const PRESET_AVATARS: PresetAvatar[] = [
     name: "Olivia"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Harper&top=bob&accessories=prescription01",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Harper&top=bob&accessories=round",
     category: "adults",
     gender: "girl",
     name: "Harper"
@@ -158,18 +158,41 @@ const PRESET_AVATARS: PresetAvatar[] = [
     name: "David"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=James&top=shortWaved&facialHair=moustaches&accessories=prescription01",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=James&top=shortWaved&facialHair=moustacheMagnum",
     category: "adults",
     gender: "boy",
     name: "James"
   },
   {
-    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Marcus&top=noHair&facialHair=beardLight",
+    url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Marcus&top=shavedSides&facialHair=beardLight",
     category: "adults",
     gender: "boy",
     name: "Marcus"
   }
 ];
+
+function AvatarImage({ src, name, className }: { src: string; name: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  const colors = ['bg-rose-400', 'bg-sky-400', 'bg-amber-400', 'bg-emerald-400', 'bg-violet-400', 'bg-teal-400', 'bg-pink-400', 'bg-indigo-400'];
+  const color = colors[name.charCodeAt(0) % colors.length];
+
+  if (failed) {
+    return (
+      <div className={`${className || ''} flex items-center justify-center ${color} text-white font-black text-lg`}>
+        {name.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      className={className || ''}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 function compressImage(file: File, maxWidth = 300, maxHeight = 300, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -412,10 +435,9 @@ export default function ProfileView({
       <section className="flex flex-col items-center text-center bg-white p-6 rounded-3xl border border-[#d2c5ae]/30 shadow-sm relative overflow-hidden">
         <div className="relative group cursor-pointer" onClick={() => setShowAvatarSelector(!showAvatarSelector)}>
           <div className="absolute -inset-1 bg-gradient-to-tr from-yellow-400 to-teal-500 rounded-full blur opacity-25 group-hover:opacity-40 transition" />
-          <img
+          <AvatarImage
             src={user.photoURL}
-            alt="User avatar"
-            referrerPolicy="no-referrer"
+            name={user.displayName || "User"}
             className="relative w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-white shadow-md object-cover animate-in zoom-in-75 duration-350"
           />
           <div className="absolute bottom-0 right-0 bg-[#006a65] text-white p-1.5 rounded-full border-2 border-white shadow-md">
@@ -523,7 +545,7 @@ export default function ProfileView({
                       className="aspect-square rounded-full border-2 border-white overflow-hidden hover:border-[#006a65] hover:scale-105 active:scale-95 transition-all shadow-sm bg-white cursor-pointer relative group/item"
                       title={av.name}
                     >
-                      <img src={av.url} alt={av.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <AvatarImage src={av.url} name={av.name} className="w-full h-full object-cover" />
                       <span className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-zinc-900/90 text-white text-[8px] px-1 py-0.5 rounded opacity-0 group-hover/item:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold">
                         {av.name}
                       </span>
@@ -546,7 +568,7 @@ export default function ProfileView({
                       className="aspect-square rounded-full border-2 border-white overflow-hidden hover:border-[#006a65] hover:scale-105 active:scale-95 transition-all shadow-sm bg-white cursor-pointer relative group/item"
                       title={av.name}
                     >
-                      <img src={av.url} alt={av.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <AvatarImage src={av.url} name={av.name} className="w-full h-full object-cover" />
                       <span className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-zinc-900/90 text-white text-[8px] px-1 py-0.5 rounded opacity-0 group-hover/item:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold">
                         {av.name}
                       </span>

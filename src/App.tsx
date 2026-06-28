@@ -6,7 +6,6 @@ import { auth, db } from './firebase';
 
 import LoginView from "./components/views/LoginView";
 import SignupView from "./components/views/SignupView";
-import OnboardingView from "./components/views/OnboardingView";
 
 import LandingView from "./components/views/LandingView";
 import GameView from "./components/views/GameView";
@@ -19,7 +18,7 @@ import CameraCapture from "./components/camera/CameraCapture";
 import ScratchCard from "./components/rewards/ScratchCard";
 import { Case, UserProfile, Hood } from "./lib/constants";
 
-type ViewState = "login" | "signup" | "onboarding" | "landing" | "game" | "profile" | "community" | "scanner_result" | "route_planner" | "admin";
+type ViewState = "login" | "signup" | "landing" | "game" | "profile" | "community" | "scanner_result" | "route_planner" | "admin";
 
 const API_BASE = (import.meta as any).env.VITE_API_URL || "";
 
@@ -150,6 +149,7 @@ export default function App() {
   const [isResolveFlow, setIsResolveFlow] = useState(false);
   const [isRejectionFlow, setIsRejectionFlow] = useState(false);
   const [activeResolveCaseId, setActiveResolveCaseId] = useState<string | null>(null);
+  const [showReconstructionOffer, setShowReconstructionOffer] = useState(false);
 
   // Active dispatcher overlay
   const [activeDispatchCase, setActiveDispatchCase] = useState<Case | null>(null);
@@ -168,7 +168,6 @@ export default function App() {
       let targetView: ViewState = "landing";
       if (hash === "login") targetView = "login";
       else if (hash === "signup") targetView = "signup";
-      else if (hash === "onboarding") targetView = "onboarding";
       else if (hash === "patrol" || hash === "game") targetView = "game";
       else if (hash === "maps" || hash === "route_planner") targetView = "route_planner";
       else if (hash === "community") targetView = "community";
@@ -236,8 +235,10 @@ export default function App() {
         const hash = window.location.hash.replace("#", "").replace("/", "");
         const userDoc = await getDoc(doc(db, 'users', authUser.uid));
         if (!userDoc.exists()) {
-          window.location.replace("#onboarding");
-          setView("onboarding");
+          if (hash !== "signup") {
+            window.location.replace("#");
+            setView("landing");
+          }
           setInitialLoading(false);
         } else {
           if (navigator.geolocation) {
@@ -284,6 +285,7 @@ export default function App() {
         setUser({
           userId: data.uid,
           displayName: data.username,
+          email: data.email || '',
           rank: computeRank(data.xp, data.trustScore).label,
           xp: data.xp || 0,
           coins: data.coins || 0,
@@ -294,12 +296,12 @@ export default function App() {
           empireValuation: data.empireValuation || 0,
           photoURL: data.avatarUrl || "https://api.dicebear.com/9.x/avataaars/svg?seed=" + data.username,
           trustScore: data.trustScore || 50,
-          activePatrols: 1,
-          reportsFiled: data.totalReports || 0,
-          resolvedRepairs: data.totalResolved || 0,
+          city: data.city || "Hyderabad",
+          area: data.area || "",
           totalReports: data.totalReports || 0,
+          totalVerifications: data.totalVerifications || 0,
           totalResolves: data.totalResolved || 0,
-          totalResolved: data.totalResolved || 0,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : '',
           warningsCount: data.warningsCount || 0,
           badges: data.badges || [],
           isAdmin: data.isAdmin || false,
@@ -489,6 +491,43 @@ export default function App() {
     return () => unsubscribe();
   }, [authUser]);
 
+  // Listen to other users' bases
+  const [publicBases, setPublicBases] = useState<any[]>([]);
+  useEffect(() => {
+    if (!authUser) {
+      setPublicBases([]);
+      return;
+    }
+    const q = query(
+      collection(db, "users"),
+      where("homePinned", "==", true)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const bases = snapshot.docs.map(docSnap => {
+        const d = docSnap.data();
+        return {
+          uid: docSnap.id,
+          username: d.username || "Scout",
+          homeLatitude: d.homeLatitude,
+          homeLongitude: d.homeLongitude,
+          isAdmin: d.isAdmin || false,
+          empireValuation: d.empireValuation || 200,
+          baseLevel: d.baseLevel || 1,
+          solarGridLevel: d.solarGridLevel || 0,
+          repairDepotLevel: d.repairDepotLevel || 0,
+          techLabLevel: d.techLabLevel || 0,
+          ecoCruiserLevel: d.ecoCruiserLevel || 0,
+          heroStatueLevel: d.heroStatueLevel || 0,
+          city: d.city || "Hyderabad",
+          area: d.area || "",
+          avatarUrl: d.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${d.username}`
+        };
+      });
+      setPublicBases(bases);
+    });
+    return () => unsubscribe();
+  }, [authUser]);
+
   const handleEstablishHQ = async (lat: number, lng: number) => {
     if (!auth.currentUser) return;
     const uid = auth.currentUser.uid;
@@ -499,17 +538,28 @@ export default function App() {
         homeLongitude: lng,
         homePinned: true,
         coins: 200,
-        empireValuation: 200
+        empireValuation: 200,
+        baseLevel: 1,
+        solarGridLevel: 0,
+        repairDepotLevel: 0,
+        techLabLevel: 0,
+        ecoCruiserLevel: 0,
+        heroStatueLevel: 0
       });
-      // Create initial Scout House Level 1
-      const scoutHouseId = "scout_house_hq";
-      await setDoc(doc(db, `users/${uid}/empire`, scoutHouseId), {
-        id: scoutHouseId,
-        type: "scout_house",
-        level: 1,
+      // Create initial HQ base Details
+      const hqDetailsId = "hq_details";
+      await setDoc(doc(db, `users/${uid}/empire`, hqDetailsId), {
+        id: hqDetailsId,
+        type: "hq_base",
+        baseLevel: 1,
+        solarGridLevel: 0,
+        repairDepotLevel: 0,
+        techLabLevel: 0,
+        ecoCruiserLevel: 0,
+        heroStatueLevel: 0,
+        valuation: 200,
         latitude: lat,
         longitude: lng,
-        incomePerHr: 5,
         builtAt: new Date().toISOString(),
         lastClaimedAt: new Date().toISOString()
       });
@@ -525,118 +575,107 @@ export default function App() {
     const uid = auth.currentUser.uid;
     try {
       const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
-      const bRef = doc(db, `users/${uid}/empire`, buildingId);
-      const bSnap = await getDoc(bRef);
-      if (!bSnap.exists()) return;
-      const bData = bSnap.data();
-      
-      const lastClaimed = new Date(bData.lastClaimedAt || bData.builtAt);
+      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
+      const hqSnap = await getDoc(hqRef);
+      if (!hqSnap.exists()) {
+        triggerToast("No active headquarters details found.", "info");
+        return;
+      }
+      const hqData = hqSnap.data();
+
+      const baseLvl = hqData.baseLevel || 1;
+      const solarLvl = hqData.solarGridLevel || 0;
+      const repairLvl = hqData.repairDepotLevel || 0;
+      const techLvl = hqData.techLabLevel || 0;
+
+      const baseRate = baseLvl === 1 ? 5 : baseLvl === 2 ? 15 : 40;
+      const solarRate = solarLvl === 1 ? 10 : solarLvl === 2 ? 25 : solarLvl === 3 ? 50 : 0;
+      const repairRate = repairLvl === 1 ? 25 : repairLvl === 2 ? 60 : repairLvl === 3 ? 120 : 0;
+      const techRate = techLvl === 1 ? 75 : techLvl === 2 ? 180 : techLvl === 3 ? 350 : 0;
+
+      const totalRate = baseRate + solarRate + repairRate + techRate;
+
+      const lastClaimed = new Date(hqData.lastClaimedAt || hqData.builtAt || new Date().toISOString());
       const now = new Date();
       const hoursElapsed = Math.max(0, (now.getTime() - lastClaimed.getTime()) / 3600000);
-      const accumulatedCoins = Math.floor(hoursElapsed * (bData.incomePerHr || 5));
-      
+      const accumulatedCoins = Math.floor(hoursElapsed * totalRate);
+
       if (accumulatedCoins <= 0) {
         triggerToast("No passive coins accumulated yet! Try again in a bit.", "info");
         return;
       }
-      
-      // Update user coins and lastClaimedAt
+
       await updateDoc(doc(db, 'users', uid), {
         coins: increment(accumulatedCoins)
       });
-      await updateDoc(bRef, {
+      await updateDoc(hqRef, {
         lastClaimedAt: now.toISOString()
       });
-      
-      triggerToast(`Collected +${accumulatedCoins} Coins from ${bData.type.replace("_", " ")}!`, "success");
+
+      triggerToast(`Collected +${accumulatedCoins} Coins from Headquarters!`, "success");
     } catch (err) {
       console.error("Collect income failed:", err);
       triggerToast("Failed to collect income.", "info");
     }
   };
 
-  const handleUpgradeScoutHouse = async (buildingId: string) => {
+  const handleUpgradeHQ = async (field: string, cost: number) => {
     if (!auth.currentUser || !user) return;
     const uid = auth.currentUser.uid;
+    if ((user.coins || 0) < cost) {
+      triggerToast(`Insufficient Coins! Upgrade costs ${cost} Coins.`, "info");
+      return;
+    }
+
     try {
       const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
-      const bRef = doc(db, `users/${uid}/empire`, buildingId);
-      const bSnap = await getDoc(bRef);
-      if (!bSnap.exists()) return;
-      const bData = bSnap.data();
-      
-      const currentLevel = bData.level || 1;
-      if (currentLevel >= 3) {
-        triggerToast("Scout House is already at maximum level!", "info");
-        return;
+      const userRef = doc(db, 'users', uid);
+      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
+
+      let currentVal = 0;
+      const hqItem = empire.find(b => b.id === "hq_details");
+      if (hqItem) {
+        currentVal = hqItem[field] || 0;
+      } else {
+        const hqSnap = await getDoc(hqRef);
+        if (hqSnap.exists()) {
+          currentVal = hqSnap.data()[field] || 0;
+        }
       }
-      
-      const cost = currentLevel === 1 ? 200 : 500;
-      const nextIncome = currentLevel === 1 ? 15 : 40;
-      
-      if ((user.coins || 0) < cost) {
-        triggerToast(`Insufficient Coins! Upgrade costs ${cost} Coins.`, "info");
-        return;
-      }
-      
-      // Deduct coins and update level/income/valuation
-      await updateDoc(doc(db, 'users', uid), {
+
+      const newVal = currentVal + 1;
+
+      await updateDoc(userRef, {
         coins: increment(-cost),
-        empireValuation: increment(cost)
+        empireValuation: increment(cost),
+        [field]: newVal
       });
-      await updateDoc(bRef, {
-        level: currentLevel + 1,
-        incomePerHr: nextIncome,
-        lastClaimedAt: new Date().toISOString() // Reset last claim date
+
+      await updateDoc(hqRef, {
+        [field]: newVal,
+        valuation: increment(cost)
       });
-      
-      triggerToast(`Upgraded Scout House to Level ${currentLevel + 1}! Income boosted to +${nextIncome} Coins/hr.`, "success");
+
+      triggerToast(`Successfully purchased Level ${newVal} upgrade!`, "success");
     } catch (err) {
-      console.error("Upgrade failed:", err);
-      triggerToast("Failed to upgrade building.", "info");
+      console.error("HQ field upgrade failed:", err);
+      triggerToast("Failed to upgrade HQ component.", "info");
     }
   };
 
+  // Deprecated wrappers for backwards compatibility
+  const handleUpgradeScoutHouse = async (buildingId: string) => {
+    await handleUpgradeHQ("baseLevel", empire.find(b => b.id === buildingId)?.level === 1 ? 200 : 500);
+  };
+
   const handleBuyBuilding = async (type: string, lat: number, lng: number) => {
-    if (!auth.currentUser || !user) return;
-    const uid = auth.currentUser.uid;
-    
     let cost = 150;
-    let income = 10;
-    if (type === "solar_grid") { cost = 150; income = 10; }
-    else if (type === "repair_depot") { cost = 300; income = 25; }
-    else if (type === "tech_lab") { cost = 800; income = 75; }
-    
-    if ((user.coins || 0) < cost) {
-      triggerToast(`Insufficient Coins! Building costs ${cost} Coins.`, "info");
-      return;
-    }
-    
-    try {
-      const { doc, collection, addDoc, updateDoc, increment } = await import('firebase/firestore');
-      
-      // Create the building in empire subcollection
-      await addDoc(collection(db, `users/${uid}/empire`), {
-        type,
-        level: 1,
-        latitude: lat,
-        longitude: lng,
-        incomePerHr: income,
-        builtAt: new Date().toISOString(),
-        lastClaimedAt: new Date().toISOString()
-      });
-      
-      // Deduct coins and add valuation
-      await updateDoc(doc(db, 'users', uid), {
-        coins: increment(-cost),
-        empireValuation: increment(cost)
-      });
-      
-      triggerToast(`Constructed ${type.replace("_", " ").toUpperCase()} successfully!`, "success");
-    } catch (err) {
-      console.error("Failed to construct building:", err);
-      triggerToast("Error placing building.", "info");
-    }
+    let field = "solarGridLevel";
+    if (type === "solar_grid") { cost = 150; field = "solarGridLevel"; }
+    else if (type === "repair_depot") { cost = 300; field = "repairDepotLevel"; }
+    else if (type === "tech_lab") { cost = 800; field = "techLabLevel"; }
+
+    await handleUpgradeHQ(field, cost);
   };
 
   // Helper to show temporary toasts
@@ -1192,6 +1231,61 @@ export default function App() {
     setCapturedImageBase64("");
     setView(returnView || "game");
     setReturnView(null);
+    setShowReconstructionOffer(true);
+  };
+
+  const handleAcceptFreeHqUpgrade = async () => {
+    if (!auth.currentUser || !user) return;
+    const uid = auth.currentUser.uid;
+    try {
+      const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
+      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
+      const hqSnap = await getDoc(hqRef);
+      if (!hqSnap.exists()) {
+        triggerToast("Please establish your HQ base first!", "info");
+        setShowReconstructionOffer(false);
+        return;
+      }
+      const hqData = hqSnap.data();
+      const currentLvl = hqData.baseLevel || 1;
+
+      if (currentLvl >= 3) {
+        await updateDoc(doc(db, 'users', uid), {
+          coins: increment(150)
+        });
+        triggerToast("HQ already at maximum level! Awarded +150 Coins instead.", "success");
+      } else {
+        await updateDoc(doc(db, 'users', uid), {
+          baseLevel: currentLvl + 1,
+          empireValuation: increment(150)
+        });
+        await updateDoc(hqRef, {
+          baseLevel: currentLvl + 1,
+          valuation: increment(150)
+        });
+        triggerToast(`HQ Base upgraded to Level ${currentLvl + 1} for free!`, "success");
+      }
+    } catch (err) {
+      console.error("Free upgrade failed:", err);
+      triggerToast("Failed to process free upgrade.", "info");
+    }
+    setShowReconstructionOffer(false);
+  };
+
+  const handleClaimBonusCoins = async () => {
+    if (!auth.currentUser || !user) return;
+    const uid = auth.currentUser.uid;
+    try {
+      const { doc, updateDoc, increment } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'users', uid), {
+        coins: increment(150)
+      });
+      triggerToast("Claimed +150 Coins bonus!", "success");
+    } catch (err) {
+      console.error("Failed to claim bonus coins:", err);
+      triggerToast("Failed to claim bonus coins.", "info");
+    }
+    setShowReconstructionOffer(false);
   };
 
   // Reset progress data hook (Dev luxury)
@@ -1257,7 +1351,7 @@ export default function App() {
   };
 
   // Render loading screen on app initialize
-  const isAuthView = view === "login" || view === "signup" || view === "onboarding";
+  const isAuthView = view === "login" || view === "signup";
   const isUnauthLanding = view === "landing" && !authUser;
   if (initialLoading || (!isAuthView && !isUnauthLanding && (!user || !hood))) {
     return (
@@ -1298,9 +1392,6 @@ export default function App() {
         <SignupView onSwitchToLogin={() => { window.location.replace("#login"); }} onGoHome={() => { window.location.hash = ""; }} />
       </div>
 
-      <div style={{ display: view === "onboarding" ? "block" : "none" }}>
-        <OnboardingView onComplete={() => { window.location.hash = "patrol"; }} />
-      </div>
 
       {/* Main Content Area */}
       <div style={{ display: view === "landing" ? "block" : "none" }}>
@@ -1310,6 +1401,7 @@ export default function App() {
           onLogin={() => { window.location.hash = "login"; }}
           onSignup={() => { window.location.hash = "signup"; }}
           onStartMission={() => { window.location.hash = "patrol"; }}
+          onViewProfile={() => { window.location.hash = "profile"; }}
           onViewLeaderboard={() => {
             setInitialLeaderboardOpen(true);
             window.location.hash = "community";
@@ -1334,6 +1426,8 @@ export default function App() {
             onCollectIncome={handleCollectIncome}
             onUpgradeScoutHouse={handleUpgradeScoutHouse}
             onBuyBuilding={handleBuyBuilding}
+            onUpgradeHQ={handleUpgradeHQ}
+            publicBases={publicBases}
             selectedCaseIdFromChat={selectedCaseIdFromChat}
             setSelectedCaseIdFromChat={setSelectedCaseIdFromChat}
             onPinHQ={handleEstablishHQ}
@@ -1564,7 +1658,7 @@ export default function App() {
       )}
 
       {/* Dynamic Bottom Tab Bar Navigation */}
-      {view !== "landing" && view !== "login" && view !== "signup" && view !== "onboarding" && view !== "scanner_result" && !activeCameraOpen && (
+      {view !== "landing" && view !== "login" && view !== "signup" && view !== "scanner_result" && !activeCameraOpen && (
         <nav className="fixed bottom-0 left-0 w-full z-40 bg-white/95 border-t border-[#d2c5ae]/30 shadow-lg backdrop-blur-md px-2 py-3 flex justify-around items-center gap-1">
           
           {/* Tab 1: Map/Patrol Grid */}
@@ -1650,6 +1744,47 @@ export default function App() {
             <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Exit</span>
           </button>
         </nav>
+      )}
+      {/* RECONSTRUCTION OFFER POPUP OVERLAY */}
+      {showReconstructionOffer && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[110] flex items-center justify-center p-6 font-sans">
+          <div className="rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-cyan-400/20"
+               style={{
+                 backdropFilter: "blur(16px)",
+                 background: "rgba(16,16,24,0.85)",
+                 color: "#white"
+               }}>
+            <div className="w-16 h-16 bg-[#7f00ff]/20 rounded-full flex items-center justify-center text-[#00f2fe] border border-[#00f2fe]/40 mb-4 animate-pulse">
+              <Sparkles className="w-8 h-8" />
+            </div>
+
+            <span className="text-[10px] bg-cyan-500/10 text-[#00f2fe] border border-[#00f2fe]/30 px-3.5 py-1 rounded-full font-black uppercase tracking-wider">
+              HQ Construction Bonus!
+            </span>
+
+            <h3 className="text-xl font-black text-white mt-3 uppercase tracking-tight">
+              Select Your HQ Reward
+            </h3>
+            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+              HQ commands offer you a construction permit or raw capital. Choose wisely to upgrade your standing.
+            </p>
+
+            <div className="w-full mt-6 space-y-3">
+              <button
+                onClick={handleAcceptFreeHqUpgrade}
+                className="w-full bg-gradient-to-r from-[#00f2fe] to-[#7f00ff] hover:opacity-90 active:scale-95 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+              >
+                🛠️ Upgrade HQ Base (Free Permit)
+              </button>
+              <button
+                onClick={handleClaimBonusCoins}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-[#f9d423] border border-[#f9d423]/30 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+              >
+                🪙 Claim +150 Coins
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

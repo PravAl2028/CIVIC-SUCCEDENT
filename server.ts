@@ -57,7 +57,7 @@ async function startServer() {
           res.setHeader("Cache-Control", "public, max-age=3600");
         }
       }
-      return originalWriteHead.apply(this, [statusCode, ...args]);
+      return originalWriteHead.apply(this, [statusCode, ...args] as any);
     };
 
     next();

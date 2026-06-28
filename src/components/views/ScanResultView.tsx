@@ -196,7 +196,7 @@ export default function ScanResultView({
           <div className="flex gap-4">
             {success ? (
               <button
-                onClick={onConfirm}
+                onClick={() => onConfirm()}
                 className="flex-1 bg-yellow-400 text-black py-4 rounded-2xl font-bold text-sm hover:bg-yellow-350 active:scale-97 cursor-pointer text-center flex items-center justify-center gap-1.5 shadow"
               >
                 Scratch Reward Card
@@ -274,7 +274,7 @@ export default function ScanResultView({
           </p>
 
           <button
-            onClick={onConfirm} // Confirm triggers small upvote completion and exits
+            onClick={() => onConfirm()} // Confirm triggers small upvote completion and exits
             className="w-full bg-yellow-400 text-black py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-yellow-350 cursor-pointer"
           >
             Claim Consensus XP

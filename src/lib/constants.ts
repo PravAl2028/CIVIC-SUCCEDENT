@@ -38,11 +38,14 @@ export interface Case {
 export interface UserProfile {
   userId: string;
   displayName: string;
+  username?: string;
   email: string;
   photoURL: string;
   xp: number;
   trustScore: number;
   coins: number;
+  city?: string;
+  area?: string;
   homeLatitude?: number;
   homeLongitude?: number;
   homePinned?: boolean;

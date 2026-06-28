@@ -236,7 +236,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   const debounceTimeoutStartRef = useRef<any>(null);
   const debounceTimeoutEndRef = useRef<any>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const routeCacheRef = useRef<Record<string, { roadRoute: Array<[number, number]>; safeRoadRoute: Array<[number, number]> }>>({});
+  const routeCacheRef = useRef<Record<string, { roadRoute: Array<[number, number]>; safeRoadRoute: Array<[number, number]>; roadRouteStats?: { distance: number; duration: number }; safeRoadRouteStats?: { distance: number; duration: number } }>>({});
   const lastFetchedParamsRef = useRef<{
     startLat: number;
     startLng: number;
