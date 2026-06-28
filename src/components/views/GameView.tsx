@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from "react";
 import { 
   Navigation, Camera, AlertOctagon, AlertTriangle, HelpCircle, ShieldCheck, Zap, Sun, Moon, 
-  Coins, Landmark, ChevronUp, ChevronDown, CheckCircle2, Hammer, ArrowRight, X, Sparkles
+  Coins, Landmark, ChevronUp, ChevronDown, CheckCircle2, Hammer, ArrowRight, X, Sparkles,
+  Locate
 } from "lucide-react";
 import GameMap, { getMarkerBg } from "../game/GameMap";
 import { Case, UserProfile, Hood } from "../../lib/constants";
 import HomePinningModal from "../game/HomePinningModal";
 
 interface GameViewProps {
+  key?: string;
   cases: Case[];
   user: UserProfile;
   hood: Hood | null;
@@ -52,6 +54,7 @@ export default function GameView({
   const [zoom, setZoom] = useState(17);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const hasSetInitialGps = useRef(false);
+  const [isAutoCentering, setIsAutoCentering] = useState(true);
 
   // Empire state managers
   const [selectedBuilding, setSelectedBuilding] = useState<any | null>(null);
@@ -229,6 +232,8 @@ export default function GameView({
             setSelectedCase(c);
             setShowFullModal(true);
           }}
+          isAutoCentering={isAutoCentering}
+          setIsAutoCentering={setIsAutoCentering}
         />
       </div>
 
@@ -585,21 +590,42 @@ export default function GameView({
       {/* Bottom Floating Control: Big Radar SCAN Button (Only in Patrol View) */}
       {patrolMode === "patrol" && (
         <div className="absolute bottom-[96px] right-3 z-10 pointer-events-none">
-          <div className="flex flex-col items-center gap-1 select-none pointer-events-auto">
+          <div className="flex flex-col items-center gap-3 select-none pointer-events-auto">
+            {/* Recenter to GPS Button - Placed above the Scan button, stable and perfectly aligned */}
             <button
-              onClick={onTriggerScan}
-              className="w-14 h-14 bg-yellow-400 hover:bg-yellow-350 active:scale-90 rounded-full flex flex-col justify-center items-center text-black border-2 border-zinc-950 shadow-2xl hover:scale-105 transition-all cursor-pointer relative"
+              type="button"
+              onClick={() => {
+                setIsAutoCentering(true);
+                setZoom(19);
+              }}
+              className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-xl cursor-pointer transition-all duration-300 active:scale-95 group hover:scale-105 bg-white ${
+                isAutoCentering
+                  ? "border-emerald-600 text-emerald-600 font-bold"
+                  : "border-zinc-200 text-zinc-600 hover:border-emerald-500/50"
+              }`}
+              title="Recenter to GPS"
+              id="btn-recenter-patrol-gps"
             >
-              <Camera className="w-5 h-5" />
-              <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">SCAN</span>
-              <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
-              </span>
+              <Locate className="w-5 h-5 transition-transform group-hover:scale-110" />
             </button>
-            <span className="bg-zinc-950/90 backdrop-blur-sm text-[7px] text-zinc-300 font-extrabold px-2 py-0.5 rounded-full border border-zinc-800/80 uppercase tracking-widest leading-none">
-              DEFECT DETECTOR
-            </span>
+
+            {/* Scan Button & Label */}
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={onTriggerScan}
+                className="w-14 h-14 bg-yellow-400 hover:bg-yellow-350 active:scale-90 rounded-full flex flex-col justify-center items-center text-black border-2 border-zinc-950 shadow-2xl hover:scale-105 transition-all cursor-pointer relative"
+              >
+                <Camera className="w-5 h-5" />
+                <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">SCAN</span>
+                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+                </span>
+              </button>
+              <span className="bg-zinc-950/90 backdrop-blur-sm text-[7px] text-zinc-300 font-extrabold px-2 py-0.5 rounded-full border border-zinc-800/80 uppercase tracking-widest leading-none">
+                DEFECT DETECTOR
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -902,9 +928,14 @@ export default function GameView({
               </div>
 
               {/* Description */}
-              <p className="text-[11px] text-zinc-300 leading-relaxed max-h-24 overflow-y-auto pr-1">
-                {selectedCase.description || "No description provided."}
-              </p>
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-zinc-300 leading-relaxed max-h-24 overflow-y-auto pr-1">
+                  {selectedCase.description || "No description provided."}
+                </p>
+                <div className="text-[8px] text-zinc-505 font-mono tracking-wide text-zinc-500">
+                  GPS: {selectedCase.latitude ? selectedCase.latitude.toFixed(6) : "0.000000"}, {selectedCase.longitude ? selectedCase.longitude.toFixed(6) : "0.000000"}
+                </div>
+              </div>
 
               {/* Reporter & Verifiers Info */}
               <div className="text-[9px] text-zinc-400 font-mono space-y-1 bg-zinc-950 border border-zinc-850 p-2.5 rounded-2xl">
@@ -932,12 +963,6 @@ export default function GameView({
                   <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">CITIZEN VOTES</span>
                   <span className="text-[11px] font-black text-teal-400 font-mono">{selectedCase.verifications || 0} Votes</span>
                 </div>
-              </div>
-
-              {/* Address / Location Text */}
-              <div className="bg-zinc-950 border border-zinc-850 p-2.5 rounded-2xl leading-tight">
-                <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest block mb-1">LOCATION ADDRESS</span>
-                <p className="text-[9px] text-zinc-300 truncate font-mono">{selectedCase.address || "Unknown coordinates"}</p>
               </div>
 
               {/* Interactive Actions (Verify/Resolve/Add Proof) */}

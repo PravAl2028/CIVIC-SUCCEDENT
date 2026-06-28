@@ -113,6 +113,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       // Draw video frame to canvas
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
       
+      // Release camera device immediately so that the LED goes off and stream is closed
+      stopCamera();
+
       // Convert to base64 jpeg
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       const base64Data = dataUrl.replace(/^data:image\/[a-z]+;base64,/, "");
@@ -142,8 +145,13 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       {/* Top Header Controls */}
       <div className="w-full flex justify-between items-center p-6 bg-gradient-to-b from-black/60 to-transparent absolute top-0 left-0 z-10">
         <button
-          onClick={onClose}
+          onClick={() => {
+            stopCamera();
+            onClose();
+          }}
           className="p-3 bg-white/10 hover:bg-white/20 active:scale-95 rounded-full transition-all"
+          title="Close Camera"
+          aria-label="Close Camera"
         >
           <X className="w-6 h-6" />
         </button>

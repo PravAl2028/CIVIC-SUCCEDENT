@@ -75,9 +75,12 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Email or Username</label>
+            <label htmlFor="login-email" className="block text-xs font-bold text-zinc-600 mb-1">Email or Username</label>
             <input
+              id="login-email"
+              name="email"
               type="text"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
@@ -86,9 +89,12 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
+            <label htmlFor="login-password" className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"

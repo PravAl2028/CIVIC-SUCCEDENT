@@ -24,6 +24,44 @@ async function startServer() {
   
   // Enable Cross-Origin Resource Sharing (CORS)
   app.use(cors());
+
+  // Header and MIME Type Sanitizer Middleware (resolves Cache-Control conflicts, Pragma, and TS/CSS Content-Type issues)
+  app.use((req, res, next) => {
+    // Remove deprecated Pragma header
+    res.removeHeader("Pragma");
+
+    // Correct MIME types for CSS and TypeScript files
+    const ext = path.extname(req.path).toLowerCase();
+    if (ext === ".css") {
+      res.setHeader("Content-Type", "text/css; charset=utf-8");
+    } else if (ext === ".ts" || ext === ".tsx") {
+      res.setHeader("Content-Type", "text/x-typescript; charset=utf-8");
+    }
+
+    // Intercept headers to resolve Cache-Control directives and remove deprecated request/response headers
+    const originalWriteHead = res.writeHead;
+    res.writeHead = function (statusCode, ...args) {
+      res.removeHeader("Pragma");
+      
+      let cacheControl = res.getHeader("Cache-Control");
+      if (cacheControl && typeof cacheControl === "string") {
+        if (cacheControl.includes("no-cache") || cacheControl.includes("no-store")) {
+          // Keep only pure no-cache, no-store directives, omitting max-age / s-maxage conflicts
+          res.setHeader("Cache-Control", "no-cache, no-store");
+        }
+      } else if (!cacheControl) {
+        if (req.url.startsWith("/api")) {
+          res.setHeader("Cache-Control", "no-cache, no-store");
+        } else {
+          // Safe cache policy for static files
+          res.setHeader("Cache-Control", "public, max-age=3600");
+        }
+      }
+      return originalWriteHead.apply(this, [statusCode, ...args]);
+    };
+
+    next();
+  });
   
   // Configure body parser with high limit for base64 image uploads
   app.use(express.json({ limit: "50mb" }));

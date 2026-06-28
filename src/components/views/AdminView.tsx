@@ -12,6 +12,7 @@ const BASELINE_CITY_DATA: Record<string, string[]> = {
 };
 
 interface AdminViewProps {
+  key?: string;
   user: any;
   agentModels?: {
     scanner: string;
@@ -246,7 +247,7 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
   const blockedUsers = usersList.filter(u => u.isBlocked && (u.warningsCount || 0) >= 3);
 
   return (
-    <div className="p-6 bg-[#F5F0E8] min-h-[100dvh] font-sans pb-32 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 bg-[#F5F0E8] min-h-screen font-sans pb-24 max-w-4xl mx-auto space-y-6">
       
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-200 pb-4 gap-4">
@@ -256,12 +257,12 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
         </div>
 
         {/* Filter (ALL, City -> area) Dropdown Selector */}
-        <div className="bg-white/80 backdrop-blur p-2.5 rounded-2xl border border-zinc-150 shadow-sm flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto">
+        <div className="bg-white/80 backdrop-blur p-2.5 rounded-2xl border border-zinc-150 shadow-sm flex items-center gap-3 w-full md:w-auto">
           <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider pl-1.5 whitespace-nowrap">🗺️ Location:</span>
           
-          <div className="flex gap-2 items-center w-full sm:w-auto flex-grow sm:flex-grow-0">
+          <div className="flex gap-2 items-center flex-grow md:flex-grow-0">
             {/* City Selector */}
-            <div className="relative min-w-0 flex-1 sm:min-w-[120px] sm:flex-grow-0">
+            <div className="relative min-w-[120px] flex-grow md:flex-grow-0">
               <select
                 value={selectedCity}
                 onChange={(e) => {
@@ -281,7 +282,7 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
             </div>
 
             {/* Area Selector */}
-            <div className="relative min-w-0 flex-1 sm:min-w-[120px] sm:flex-grow-0">
+            <div className="relative min-w-[120px] flex-grow md:flex-grow-0">
               <select
                 value={selectedArea}
                 onChange={(e) => setSelectedArea(e.target.value)}
@@ -559,7 +560,7 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
                   <tr key={u.id} className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <img src={u.avatarUrl || "https://api.dicebear.com/9.x/avataaars/svg?seed=" + u.username} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-zinc-200 object-cover" />
+                        <img src={u.avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + u.username} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-zinc-200 object-cover" />
                         <div>
                           <div className="font-bold text-zinc-800 flex items-center gap-1">
                             {u.username} {u.isAdmin && <Shield className="w-3 h-3 text-[#006a65]" />}
@@ -690,7 +691,7 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
             <div className="p-5 border-b border-zinc-100 flex justify-between items-center bg-zinc-50">
               <div className="flex items-center gap-2">
                 <img
-                  src={selectedChatUser.avatarUrl || "https://api.dicebear.com/9.x/avataaars/svg?seed=" + selectedChatUser.username}
+                  src={selectedChatUser.avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + selectedChatUser.username}
                   alt=""
                   className="w-10 h-10 rounded-full border border-zinc-200"
                 />

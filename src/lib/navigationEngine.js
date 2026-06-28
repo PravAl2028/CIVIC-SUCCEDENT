@@ -23,6 +23,7 @@ export function computeProgress(position, route) {
  * @param {Function} [options.onProgress]
  * @param {Function} [options.onRerouted]
  * @param {Function} [options.onError]
+ * @param {Object} [options.initialRoute]
  */
 export function createNavigationSession({
   destination,
@@ -32,9 +33,9 @@ export function createNavigationSession({
   onProgress,
   onRerouted,
   onError,
-  initialRoute,
+  initialRoute = null,
 } = {}) {
-  let route = initialRoute || null;
+  let route = initialRoute;
   let lastProcessedAt = -Infinity;
   let deviatedSinceMs = null;
   let lastRerouteAt = -Infinity;

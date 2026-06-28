@@ -3,11 +3,11 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, useMa
 import L from "leaflet";
 import { motion, useMotionValue, useTransform, animate } from "motion/react";
 import { 
-  Compass, MapPin, AlertTriangle, CheckCircle2, Droplets, Lightbulb, Trash2, 
+  Compass, Locate, MapPin, AlertTriangle, CheckCircle2, Droplets, Lightbulb, Trash2, 
   Navigation, Map, Settings, Check, Search, ArrowRight, ChevronRight, 
   ShieldAlert, Sparkles, Clock, ArrowLeftRight, AlertCircle, RefreshCw, Layers,
   Volume2, VolumeX, Play, Square, Trophy, Milestone, Zap, Smartphone, Gamepad2, Plus, Minus,
-  X, Mic, CornerUpLeft, CornerUpRight, MoveUp, ShieldCheck, Camera
+  X, Mic, CornerUpLeft, CornerUpRight, MoveUp, ShieldCheck, Camera, ArrowLeft
 } from "lucide-react";
 import { Case, DamageType } from "../../lib/constants";
 import { haversineDistance } from "../../lib/geo";
@@ -29,8 +29,6 @@ function RouteMapEvents({
     click(e) {
       if (clickMode) {
         onSetLocation(e.latlng, clickMode);
-      } else {
-        onSetLocation(e.latlng, "end");
       }
     }
   });
@@ -53,32 +51,65 @@ function SetMapBounds({
   start, 
   end,
   navActive,
-  navCurrentPos
+  navCurrentPos,
+  playerPos,
+  isAutoCentering,
+  setIsAutoCentering
 }: { 
   start: { lat: number; lng: number } | null; 
   end: { lat: number; lng: number } | null; 
   navActive: boolean;
   navCurrentPos: [number, number] | null;
+  playerPos: { lat: number; lng: number };
+  isAutoCentering: boolean;
+  setIsAutoCentering: (val: boolean) => void;
 }) {
   const map = useMap();
+  const prevAutoCentering = useRef(isAutoCentering);
+
+  useMapEvents({
+    dragstart() {
+      setIsAutoCentering(false);
+    },
+    zoomstart() {
+      setIsAutoCentering(false);
+    }
+  });
+
   useEffect(() => {
     // Call invalidateSize multiple times to catch any layout/transition completion
     const timer1 = setTimeout(() => map.invalidateSize(), 100);
     const timer2 = setTimeout(() => map.invalidateSize(), 300);
     const timer3 = setTimeout(() => map.invalidateSize(), 500);
 
-    if (navActive && navCurrentPos) {
-      map.setView(navCurrentPos, 17, { animate: true });
+    const autoCenteringJustEnabled = isAutoCentering && !prevAutoCentering.current;
+    prevAutoCentering.current = isAutoCentering;
+
+    if (autoCenteringJustEnabled) {
+      const gpsPos: [number, number] = navActive && navCurrentPos
+        ? navCurrentPos
+        : [playerPos.lat, playerPos.lng];
+      map.setView(gpsPos, 17, { animate: true });
+    } else if (navActive && navCurrentPos) {
+      if (isAutoCentering) {
+        map.setView(navCurrentPos, 17, { animate: true });
+      }
     } else if (start && end) {
-      const bounds = L.latLngBounds([
-        [start.lat, start.lng],
-        [end.lat, end.lng]
-      ]);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17, animate: true, duration: 1 });
+      if (isAutoCentering) {
+        const bounds = L.latLngBounds([
+          [start.lat, start.lng],
+          [end.lat, end.lng]
+        ]);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17, animate: true, duration: 1 });
+      }
     } else if (start) {
-      map.setView([start.lat, start.lng], 16, { animate: true });
+      if (isAutoCentering) {
+        map.setView([start.lat, start.lng], 16, { animate: true });
+      }
     } else if (end) {
-      map.setView([end.lat, end.lng], 16, { animate: true });
+      if (isAutoCentering) {
+        map.setView([end.lat, end.lng], 16, { animate: true });
+      }
     }
     
     return () => {
@@ -86,15 +117,34 @@ function SetMapBounds({
       clearTimeout(timer2);
       clearTimeout(timer3);
     };
-  }, [start, end, navActive, navCurrentPos, map]);
+  }, [start, end, navActive, navCurrentPos, map, isAutoCentering, playerPos]);
   return null;
 }
 
 // Custom Map Zoom Controls Component
-function MapZoomControls() {
+function MapZoomControls({
+  isAutoCentering,
+  setIsAutoCentering
+}: {
+  isAutoCentering: boolean;
+  setIsAutoCentering: (val: boolean) => void;
+}) {
   const map = useMap();
   return (
     <div className="absolute right-4 top-[55%] md:bottom-24 md:top-auto -translate-y-1/2 md:translate-y-0 z-[400] flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setIsAutoCentering(true)}
+        className={`w-10 h-10 border shadow-xl cursor-pointer transition-all duration-300 active:scale-95 group rounded-2xl flex items-center justify-center bg-white ${
+          isAutoCentering
+            ? "border-emerald-600 text-emerald-600 font-bold"
+            : "border-zinc-200 hover:border-[#006a65]/45 text-zinc-600"
+        }`}
+        title="Recenter to GPS"
+        id="btn-recenter-safe-gps"
+      >
+        <Locate className="w-5 h-5 transition-transform group-hover:scale-110" />
+      </button>
       <button
         type="button"
         onClick={() => map.zoomIn()}
@@ -136,6 +186,7 @@ const endIcon = createTeardropIcon("#ea4335"); // Google Red for Destination
 
 
 interface RoutePlannerViewProps {
+  key?: string;
   cases: Case[];
   playerPos: { lat: number; lng: number };
   setPlayerPos?: (pos: { lat: number; lng: number }) => void;
@@ -144,6 +195,7 @@ interface RoutePlannerViewProps {
 
 function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: RoutePlannerViewProps) {
   // Inputs & Selections
+  const [isAutoCentering, setIsAutoCentering] = useState(true);
   const [startPoint, setStartPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [endPoint, setEndPoint] = useState<{ lat: number; lng: number } | null>(null);
   
@@ -1063,6 +1115,26 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              {endPoint && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEndPoint(null);
+                    setEndInput("");
+                    setRoadRoute([]);
+                    setSafeRoadRoute([]);
+                    setClickMode(null);
+                  }}
+                  className={`p-1.5 flex items-center justify-center rounded-lg border transition-all cursor-pointer mr-1 ${
+                    isDark 
+                      ? "bg-zinc-850 border-zinc-700 text-zinc-300 hover:text-white" 
+                      : "bg-zinc-100 border-zinc-250 text-zinc-650 hover:bg-zinc-200"
+                  }`}
+                  title="Go Back & Clear Destination"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </button>
+              )}
               <Navigation className={`w-5 h-5 animate-pulse ${isDark ? "text-yellow-400" : "text-[#006a65]"}`} />
               <h2 className={`font-display text-xs font-black uppercase tracking-wider ${isDark ? "text-yellow-400" : "text-[#006a65]"}`}>
                 Safe Navigation Maps
@@ -1335,6 +1407,24 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             {/* Active Directions & Start Ride controls */}
             {startPoint && endPoint ? (
               <div className="p-4 flex-1 space-y-4">
+                {/* Back / Clear Route row */}
+                <div className="flex justify-between items-center bg-zinc-50 border border-zinc-200/60 p-2.5 rounded-xl">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Route Active</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEndPoint(null);
+                      setEndInput("");
+                      setRoadRoute([]);
+                      setSafeRoadRoute([]);
+                      setClickMode(null);
+                    }}
+                    className="flex items-center gap-1 text-xs font-black text-[#006a65] hover:text-[#004d4a] transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Change Destination
+                  </button>
+                </div>
                 {loadingRoute ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                     <RefreshCw className="w-8 h-8 text-[#006a65] animate-spin" />
@@ -1618,6 +1708,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
             end={endPoint} 
             navActive={isRiding} 
             navCurrentPos={navCurrentPos} 
+            playerPos={playerPos}
+            isAutoCentering={isAutoCentering}
+            setIsAutoCentering={setIsAutoCentering}
           />
           
           <MapReferenceTracker mapRef={mapRef} />
@@ -1786,7 +1879,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
           )}
 
           {/* Custom Map Zoom Buttons */}
-          <MapZoomControls />
+          <MapZoomControls isAutoCentering={isAutoCentering} setIsAutoCentering={setIsAutoCentering} />
 
         </MapContainer>
 

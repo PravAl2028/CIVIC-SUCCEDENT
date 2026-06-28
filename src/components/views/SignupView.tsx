@@ -53,9 +53,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
 
         <form onSubmit={handleSignup} className="space-y-3">
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Username</label>
+            <label htmlFor="signup-username" className="block text-xs font-bold text-zinc-600 mb-1">Username</label>
             <input
+              id="signup-username"
+              name="username"
               type="text"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
@@ -64,9 +67,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Email</label>
+            <label htmlFor="signup-email" className="block text-xs font-bold text-zinc-600 mb-1">Email</label>
             <input
+              id="signup-email"
+              name="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
@@ -75,9 +81,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Phone Number (optional)</label>
+            <label htmlFor="signup-phone" className="block text-xs font-bold text-zinc-600 mb-1">Phone Number (optional)</label>
             <input
+              id="signup-phone"
+              name="phone"
               type="tel"
+              autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
@@ -85,9 +94,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
+            <label htmlFor="signup-password" className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
             <input
+              id="signup-password"
+              name="password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
@@ -96,9 +108,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-600 mb-1">Confirm Password</label>
+            <label htmlFor="signup-confirm-password" className="block text-xs font-bold text-zinc-600 mb-1">Confirm Password</label>
             <input
+              id="signup-confirm-password"
+              name="confirmPassword"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"

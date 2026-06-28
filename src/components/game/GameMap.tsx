@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { Compass, Locate, MapPin, AlertTriangle, CheckCircle2, Droplets, Lightbulb, Trash2 } from "lucide-react";
@@ -72,10 +72,19 @@ const getLeafletMarkerIcon = (c: Case) => {
 };
 
 // Custom component to handle map centering programmatically without constant jitter
-function ChangeMapView({ center }: { center: [number, number] }) {
+function ChangeMapView({
+  center,
+  isAutoCentering,
+  setIsAutoCentering
+}: {
+  center: [number, number];
+  isAutoCentering: boolean;
+  setIsAutoCentering: (val: boolean) => void;
+}) {
   const map = useMap();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const prevAutoCentering = useRef(isAutoCentering);
 
   useMapEvents({
     popupopen() {
@@ -83,10 +92,19 @@ function ChangeMapView({ center }: { center: [number, number] }) {
     },
     popupclose() {
       setIsPopupOpen(false);
+    },
+    dragstart() {
+      setIsAutoCentering(false);
+    },
+    zoomstart() {
+      setIsAutoCentering(false);
     }
   });
 
   useEffect(() => {
+    const autoCenteringJustEnabled = isAutoCentering && !prevAutoCentering.current;
+    prevAutoCentering.current = isAutoCentering;
+
     if (isPopupOpen) {
       // Suspend auto-centering if popup is open to avoid flickering and fighting Leaflet's autoPan
       return;
@@ -99,18 +117,25 @@ function ChangeMapView({ center }: { center: [number, number] }) {
       return;
     }
 
+    if (!isAutoCentering) {
+      return;
+    }
+
     const currentMapCenter = map.getCenter();
     const latDiff = Math.abs(center[0] - currentMapCenter.lat);
     const lngDiff = Math.abs(center[1] - currentMapCenter.lng);
 
-    if (latDiff > 0.05 || lngDiff > 0.05) {
+    if (autoCenteringJustEnabled) {
+      // User manually requested recenter: center smoothly right away and zoom in very close
+      map.setView(center, 19, { animate: true });
+    } else if (latDiff > 0.05 || lngDiff > 0.05) {
       // Huge jump (e.g., recentering to a new city): jump immediately without animation
       map.setView(center, map.getZoom(), { animate: false });
     } else if (latDiff > 0.0005 || lngDiff > 0.0005) {
       // Medium movement (beyond ~50m threshold): pan smoothly to catch up
       map.panTo(center, { animate: true, duration: 0.6 });
     }
-  }, [center, map, isFirstLoad, isPopupOpen]);
+  }, [center, map, isFirstLoad, isPopupOpen, isAutoCentering]);
 
   return null;
 }
@@ -152,6 +177,8 @@ interface GameMapProps {
   onMapClickForPlacement?: (lat: number, lng: number) => void;
   placingBuildingType?: string | null;
   onSelectCase?: (c: Case) => void;
+  isAutoCentering?: boolean;
+  setIsAutoCentering?: (val: boolean) => void;
 }
 
 export default function GameMap({
@@ -171,8 +198,13 @@ export default function GameMap({
   onSelectBuilding,
   onMapClickForPlacement,
   placingBuildingType = null,
-  onSelectCase
+  onSelectCase,
+  isAutoCentering: propIsAutoCentering,
+  setIsAutoCentering: propSetIsAutoCentering
 }: GameMapProps) {
+  const [localIsAutoCentering, localSetIsAutoCentering] = useState(true);
+  const isAutoCentering = propIsAutoCentering !== undefined ? propIsAutoCentering : localIsAutoCentering;
+  const setIsAutoCentering = propSetIsAutoCentering !== undefined ? propSetIsAutoCentering : localSetIsAutoCentering;
   const [placedMarker, setPlacedMarker] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -302,7 +334,7 @@ export default function GameMap({
         className="w-full h-full z-0"
       >
         <ZoomHandler zoom={mapZoom} />
-        <ChangeMapView center={centerCoords} />
+        <ChangeMapView center={centerCoords} isAutoCentering={isAutoCentering} setIsAutoCentering={setIsAutoCentering} />
         {patrolMode === "sim" && <MapEvents onClick={handleMapClick} />}
 
         {mapTheme === "light" ? (
@@ -379,7 +411,7 @@ export default function GameMap({
         )}
       </MapContainer>
 
-      {/* Floating Map HUD Control Elements removed as requested */}
+      {/* Floating Recenter Map Button removed as it is now in GameView.tsx directly above the Scan button */}
 
 
     </div>

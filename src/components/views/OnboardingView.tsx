@@ -238,10 +238,13 @@ export default function OnboardingView({ onComplete }: { onComplete: () => void 
             </div>
 
             <div className="pt-4 border-t border-zinc-100">
-              <label className="block text-xs font-bold text-zinc-600 mb-1">Or type your own:</label>
+              <label htmlFor="onboard-custom-area" className="block text-xs font-bold text-zinc-600 mb-1">Or type your own:</label>
               <div className="flex gap-2">
                 <input
+                  id="onboard-custom-area"
+                  name="customArea"
                   type="text"
+                  autoComplete="off"
                   value={customArea}
                   onChange={(e) => { setCustomArea(e.target.value); setSelectedArea(''); }}
                   className="flex-1 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"

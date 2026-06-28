@@ -5,6 +5,7 @@ import { auth, db } from "../../firebase";
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
 
 interface CommunityViewProps {
+  key?: string;
   hood: Hood;
   leaderboard?: any;
   liveActivities?: any;

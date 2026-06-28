@@ -214,6 +214,7 @@ function compressImage(file: File, maxWidth = 300, maxHeight = 300, quality = 0.
 }
 
 interface ProfileViewProps {
+  key?: string;
   user: UserProfile;
   cases: Case[];
   onReset: () => void;
@@ -447,6 +448,10 @@ export default function ProfileView({
               <div className="h-full bg-[#f0c040] rounded-full" style={{ width: `${Math.min(100, progressPercent)}%` }} />
             </div>
           </div>
+          <div className="text-[10px] font-black text-[#006a65] font-mono flex items-center gap-1 select-none">
+            <span>🛡️ Civic Trust:</span>
+            <span>{Math.min(100, user.trustScore)}%</span>
+          </div>
           <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">
             {rankInfo.xpNeeded.toLocaleString()} XP to reach {rankInfo.nextRank || "Legend"}
           </div>
@@ -585,20 +590,11 @@ export default function ProfileView({
       {/* Stats Bento Grid */}
       <section className="grid grid-cols-2 gap-4">
         {/* Stat 1 */}
-        <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-[#775a00] flex flex-col justify-between min-h-[110px]">
+        <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-[#775a00] flex flex-col justify-between min-h-[110px] col-span-2">
           <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total XP</span>
           <div>
             <p className="text-2xl font-black text-zinc-900 tracking-tight font-mono">{user.xp.toLocaleString()}</p>
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">POINTS</p>
-          </div>
-        </div>
-
-        {/* Stat 2 */}
-        <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-[#006a65] flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Civic Trust</span>
-          <div>
-            <p className="text-2xl font-black text-zinc-900 tracking-tight font-mono">{user.trustScore}%</p>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">CONFIDENCE SCORE</p>
           </div>
         </div>
 

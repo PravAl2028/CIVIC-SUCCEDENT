@@ -388,10 +388,13 @@ export default function App() {
       try {
         const { doc, updateDoc, increment, setDoc } = await import('firebase/firestore');
 
+        const currentTrust = userData.trustScore || 50;
+        const newTrust = Math.min(100, Math.max(0, currentTrust + levelUpRewards.trustBonus));
+
         // 1. Award coins and trust score bonuses directly to the user document
         await updateDoc(doc(db, 'users', uid), {
           coins: increment(levelUpRewards.coinsBonus),
-          trustScore: increment(levelUpRewards.trustBonus),
+          trustScore: newTrust,
           level: newLevel
         });
 
@@ -1167,11 +1170,13 @@ export default function App() {
           const coinsToAdd = scratchReward.coinsEarned || 0;
 
           const newXp = oldXp + xpToAdd;
+          const currentTrust = userData.trustScore || 50;
+          const newTrust = Math.min(100, Math.max(0, currentTrust + trustToAdd));
 
           // 3. Update stats
           await updateDoc(userRef, {
             xp: increment(xpToAdd),
-            trustScore: increment(trustToAdd),
+            trustScore: newTrust,
             coins: increment(coinsToAdd)
           });
 
