@@ -313,6 +313,28 @@ async function startServer() {
     }
   });
 
+  // Real Reverse Geocoding using Geoapify API
+  async function realReverseGeocode(lat: number, lng: number): Promise<{ address: string; landmark: string }> {
+    try {
+      const apiKey = process.env.VITE_GEOAPIFY_API_KEY || "caecb90e637a43f49ca3f9829399eb2a";
+      const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=${apiKey}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+          const props = data.features[0].properties;
+          return {
+            address: props.formatted || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+            landmark: props.name || props.suburb || props.district || "Near current coordinates"
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Real reverse geocoding failed on backend, falling back:", e);
+    }
+    return simulateReverseGeocode(lat, lng);
+  }
+
   // Scanner Agent API: analyzes an uploaded base64 image
   app.post("/api/agents/scanner", async (req, res) => {
     try {
@@ -351,7 +373,7 @@ async function startServer() {
       }
 
       // Geocode to get rich address details
-      const geocode = simulateReverseGeocode(latitude, longitude);
+      const geocode = await realReverseGeocode(Number(latitude), Number(longitude));
 
       // Create case
       const newCase: any = {

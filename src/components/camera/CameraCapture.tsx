@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Camera, RefreshCw, X, Circle, AlertTriangle } from "lucide-react";
 
 interface CameraCaptureProps {
-  onCapture: (base64Data: string) => void;
+  onCapture: (base64Data: string, lat?: number, lng?: number) => void;
   onClose: () => void;
 }
 
@@ -117,7 +117,21 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       const base64Data = dataUrl.replace(/^data:image\/[a-z]+;base64,/, "");
       
-      onCapture(base64Data);
+      // Retrieve live GPS coordinates at the exact moment of capture
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            onCapture(base64Data, position.coords.latitude, position.coords.longitude);
+          },
+          (err) => {
+            console.warn("Failed to get live GPS on capture, utilizing fallback:", err);
+            onCapture(base64Data);
+          },
+          { enableHighAccuracy: true, timeout: 3500 }
+        );
+      } else {
+        onCapture(base64Data);
+      }
     }
   };
 

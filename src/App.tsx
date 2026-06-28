@@ -801,9 +801,12 @@ export default function App() {
   };
 
   // Receive Captured Base64 Photo
-  const handleCaptureComplete = async (base64: string) => {
+  const handleCaptureComplete = async (base64: string, capturedLat?: number, capturedLng?: number) => {
     setCapturedImageBase64(base64);
     setActiveCameraOpen(false);
+
+    const finalLat = capturedLat !== undefined ? capturedLat : playerPos.lat;
+    const finalLng = capturedLng !== undefined ? capturedLng : playerPos.lng;
 
     if (isRejectionFlow && activeResolveCaseId) {
       try {
@@ -814,7 +817,9 @@ export default function App() {
             caseId: activeResolveCaseId,
             userId: user?.userId,
             vote: "proof",
-            imageBase64: base64
+            imageBase64: base64,
+            latitude: finalLat,
+            longitude: finalLng
           })
         });
         if (!res.ok) {
@@ -866,7 +871,9 @@ export default function App() {
             caseId: activeResolveCaseId,
             afterImageBase64: compressedBase64,
             userId: user?.userId,
-            selectedModel: agentModels.resolver
+            selectedModel: agentModels.resolver,
+            latitude: finalLat,
+            longitude: finalLng
           })
         });
 
@@ -900,8 +907,8 @@ export default function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageBase64: compressedBase64,
-            latitude: playerPos.lat,
-            longitude: playerPos.lng,
+            latitude: finalLat,
+            longitude: finalLng,
             userId: user?.userId,
             selectedModel: agentModels.scanner
           })
