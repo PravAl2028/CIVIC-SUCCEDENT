@@ -37,43 +37,43 @@ Here is a visual walkthrough of the application's core functionality, using scre
 
 ### 1. Landing Page
 The portal homepage highlighting the Gemini Camera Inspector and real-time civic mission entry.
-![Landing Page](./screenshots/image1.png)
+<img src="./screenshots/image1.png" width="300" alt="Landing Page" />
 
 ### 2. Main Patrol Dashboard & Defect Detector
 The primary interface showing the real-time map, current scout location, active hazard warning markers, and coordinate HUD.
-![Patrol Dashboard](./screenshots/image2.png)
+<img src="./screenshots/image2.png" width="300" alt="Patrol Dashboard" />
 
 ### 3. Safe Navigation Route Planner
 Bypass routing controls allowing scouts to dynamically plan routes that completely avoid active hazard zones.
-![Safe Navigation Map](./screenshots/image3.png)
+<img src="./screenshots/image3.png" width="300" alt="Safe Navigation Map" />
 
 ### 4. Route Preferences (Safest vs. Fastest)
 Selection panel for routing preferences showing the avoided hazard details and safety index score.
-![Route Preferences](./screenshots/image4.png)
+<img src="./screenshots/image4.png" width="300" alt="Route Preferences" />
 
 ### 5. Turn-by-Turn GPS Navigation HUD
 Active turn-by-turn guidance mode with a real-time speedometer, guidance banners, and reporting integration.
-![Navigation HUD](./screenshots/image5.png)
+<img src="./screenshots/image5.png" width="300" alt="Navigation HUD" />
 
 ### 6. Gamified Empire Builder (HQ Simulation)
 The Headquarters building interface showing the scout's base, valuation counters, and neighboring scouts' bases.
-![Sim Mode Headquarters](./screenshots/image6.png)
+<img src="./screenshots/image6.png" width="300" alt="Sim Mode Headquarters" />
 
 ### 7. Local Community Chat Lounge
 Active community lounge for Hyderabad showing localized warnings, reports, and AI-moderated chat logs.
-![Community Lounge](./screenshots/image7.png)
+<img src="./screenshots/image7.png" width="300" alt="Community Lounge" />
 
 ### 8. Scout Profile & Rewards Hub
 Profile dashboard showing total XP, reports filed, resolves statistics, rewards scratching history, and seed control.
-![Profile and Rewards](./screenshots/image8.png)
+<img src="./screenshots/image8.png" width="300" alt="Profile and Rewards" />
 
 ### 9. AI Agent Configuration Console
 Admin control panel for configuring Gemini model engine models (Scanner, Dispatcher, Resolver, Moderator) in real-time.
-![AI Config Console](./screenshots/image9.png)
+<img src="./screenshots/image9.png" width="300" alt="AI Config Console" />
 
 ### 10. Admin User Management & Dispatch Log
 Admin user moderation tools, warning audit logs, and dispatched municipal letters history.
-![Admin Management](./screenshots/image10.png)
+<img src="./screenshots/image10.png" width="300" alt="Admin Management" />
 
 ---
 
