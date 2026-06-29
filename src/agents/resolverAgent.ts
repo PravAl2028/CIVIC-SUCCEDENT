@@ -11,6 +11,10 @@ Analyze both images and determine:
 4. QUALITY ASSESSMENT: If resolved, rate the repair quality (1-10)
 
 Consider:
+- **DETECT SCREEN / PAPER RE-PHOTOGRAPHY IN AFTER PHOTO (ANTI-FRAUD)**:
+  - Inspect the **AFTER** photo to ensure it is a real, primary, direct photo of the outdoor location.
+  - Check for signs of re-photography: computer screen borders, laptop bezels, TV edges, moire pixel pattern grids, glare/reflection on monitor glass, physical paper sheet edges, paper folds/creases, or hands holding a printed photo.
+  - If you detect that the **AFTER** photo is a picture of a screen or paper showing a resolved state, you MUST reject the resolution: set "resolutionStatus" to "unchanged", "confidence" to 100, and state "REJECTED: The after photo is a picture of a screen or paper print displaying a resolved state. Submissions must show the real physical outdoor location." in the explanation.
 - Changes in road/surface condition between photos
 - The photos may be taken from different angles or at different times of day
 - Look for fresh asphalt/cement patches, construction materials, or equipment

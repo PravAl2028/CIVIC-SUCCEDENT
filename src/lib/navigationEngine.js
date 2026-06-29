@@ -10,21 +10,10 @@ export function computeProgress(position, route) {
   const here = [position.lng, position.lat];
   const distanceToRoute = turf.pointToLineDistance(here, route.line, { units: "meters" });
   const snapped = turf.nearestPointOnLine(route.line, turf.point(here), { units: "meters" });
-  const remainingMeters = turf.length(route.line, { units: "meters" }) - snapped.properties.location;
+  const remainingMeters = turf.length(route.line, { units: "meters" }) - (snapped.properties.location ?? 0);
   return { distanceToRoute, remainingMeters };
 }
 
-/**
- * @param {Object} options
- * @param {[number, number]} options.destination
- * @param {any[]} [options.hazards]
- * @param {string} [options.mode]
- * @param {Function} [options.routeFetcher]
- * @param {Function} [options.onProgress]
- * @param {Function} [options.onRerouted]
- * @param {Function} [options.onError]
- * @param {Object} [options.initialRoute]
- */
 export function createNavigationSession({
   destination,
   hazards = [],
@@ -41,7 +30,7 @@ export function createNavigationSession({
   let lastRerouteAt = -Infinity;
   let rerouting = false;
 
-  async function setInitialRoute(start, t = Date.now()) {
+  async function setInitialRoute(start) {
     const result = await routeFetcher(start, destination, hazards, mode);
     route = result;
     onRerouted?.(result);
