@@ -1,6 +1,5 @@
 # Civic Succedent
 **Submission for the Hack the Limit Hackathon**  
-*Problem Statement: Community Hero - Hyperlocal Problem Solver*
 
 Gamifying citizen-led infrastructure reporting with multi-agent AI verification and real-time safe-route navigation.
 
