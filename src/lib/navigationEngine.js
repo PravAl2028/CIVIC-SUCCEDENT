@@ -14,14 +14,25 @@ export function computeProgress(position, route) {
   return { distanceToRoute, remainingMeters };
 }
 
+/**
+ * @param {object} params
+ * @param {[number, number]} params.destination
+ * @param {any[]} [params.hazards]
+ * @param {string} [params.mode]
+ * @param {Function} [params.routeFetcher]
+ * @param {Function} [params.onProgress]
+ * @param {Function} [params.onRerouted]
+ * @param {Function} [params.onError]
+ * @param {any} [params.initialRoute]
+ */
 export function createNavigationSession({
-  destination,
+  destination = null,
   hazards = [],
   mode = "fastest",
   routeFetcher = findRoute,
-  onProgress,
-  onRerouted,
-  onError,
+  onProgress = null,
+  onRerouted = null,
+  onError = null,
   initialRoute = null,
 } = {}) {
   let route = initialRoute;

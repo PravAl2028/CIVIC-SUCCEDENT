@@ -1,5 +1,5 @@
 # Civic Succedent
-**Submission for the Vibe2Ship Hackathon**  
+**Submission for the Hack the Limit Hackathon**  
 *Problem Statement: Community Hero - Hyperlocal Problem Solver*
 
 Gamifying citizen-led infrastructure reporting with multi-agent AI verification and real-time safe-route navigation.
@@ -8,8 +8,7 @@ Gamifying citizen-led infrastructure reporting with multi-agent AI verification 
 
 ## 🔗 Project Links
 - **Deployed Application (Demo)**: [https://civic-succedent.web.app](https://civic-succedent.web.app)
-- **GitHub Repository**: [https://github.com/PravAl2028/CIVIC-SUCCEDENT](https://github.com/PravAl2028/CIVIC-SUCCEDENT)
-- **Demo Video Walkthrough**: [Watch on Google Drive](https://drive.google.com/file/d/14bvEB3wREINRScQapNA69ZW2RPKQIqpT/view?usp=sharing)
+- **YouTube Video Walkthrough**: [https://youtu.be/KM1cv3nBvdQ](https://youtu.be/KM1cv3nBvdQ)
 
 ---
 
@@ -17,7 +16,7 @@ Gamifying citizen-led infrastructure reporting with multi-agent AI verification 
 
 Watch the full walkthrough demonstrating Civic Succedent's live navigation routing, HQ gameplay, and multi-agent AI verification system:
 
-[![Watch Demo Video](https://img.shields.io/badge/Watch%20Demo%20Video-blue?style=for-the-badge&logo=google-drive&logoColor=white)](https://drive.google.com/file/d/14bvEB3wREINRScQapNA69ZW2RPKQIqpT/view?usp=sharing)
+[![Watch Demo Video](https://img.shields.io/badge/Watch%20Demo%20Video-red?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/KM1cv3nBvdQ)
 
 ---
 
@@ -68,13 +67,13 @@ Admin user moderation tools, warning audit logs, and dispatched municipal letter
 ---
 
 ## ⚠️ The Problem
-Civic infrastructure damage — potholes, water leaks, broken streetlights — routinely goes unreported. Existing channels are fragmented, slow, and provide no incentives for community action. At the same time, pedestrians have no real-time way to know which routes are actually safe until they walk straight into active hazards.
+Civic infrastructure damage — potholes, water leaks, broken streetlights — routinely goes unreported. Existing channels are fragmented, slow, and provide no incentives for community action. At the same time, pedestrians and riders have no real-time way to know which routes are actually safe until they navigate straight into active hazards.
 
 ## 💡 The Solution
 Civic Succedent turns spotting a hazard into a rewarding game loop:
 1. **Scan** the hazard with your phone camera.
 2. Let a **Gemini-powered multi-agent pipeline** verify and score it.
-3. Once the community consensus verifies the report, the app **automatically reroutes pedestrians** around the hazard in real-time.
+3. Once the community consensus verifies the report, the app **automatically reroutes pedestrians and riders** around the hazard in real-time.
 
 ---
 
@@ -87,7 +86,7 @@ Scout on foot with real-time GPS tracking or switch to the **on-screen virtual j
 A server-side **Gemini Scanner Agent** analyzes uploaded images. It confirms the photo shows a genuine outdoor civic hazard (not household clutter) and assigns a severity score (1–10). Full community consensus requires 3 neighborhood approval votes.
 
 ### 3. Safe Navigation
-Confirmed hazards feed directly into a live **OSRM (Open Source Routing Machine) engine** that reroutes walkers around active defect coordinates. The system includes custom route toggles designed specifically for kids, seniors, and cyclists.
+Confirmed hazards feed directly into a live **OSRM (Open Source Routing Machine) engine** that reroutes pedestrians and riders around active defect coordinates. The system includes custom route toggles designed specifically for kids, seniors, cyclists, and riders.
 
 ### 4. HQ Empire
 Manage your municipal base to generate passive offline coin income! Players can build and upgrade the **Base Cabin**, **Solar Grid Array**, and **Repair Depot Wing** (each Level 1–3) to compound offline yields, earning up to **~285 coins/hour** at max level.
@@ -119,7 +118,7 @@ Four Gemini-powered server-side agents handle the moderation, validation, and ec
 - **Database & Auth**: Firebase Auth and Cloud Firestore (real-time listeners).
 - **APIs & SDKs**: Google GenAI SDK (`@google/genai`), Geoapify Geocoding API, OSRM.
 
-This application was designed, built, and optimized using **Google AI Studio** and the agentic AI coding assistant **Antigravity**.
+
 
 ---
 
