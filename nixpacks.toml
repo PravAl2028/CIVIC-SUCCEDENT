@@ -1,5 +1,8 @@
+[phases.setup]
+cmds = ["rm -rf /app/node_modules/.cache || true"]
+
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --prefer-offline"]
 
 [phases.build]
 cmds = ["npm run build:server"]
