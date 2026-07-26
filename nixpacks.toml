@@ -2,4 +2,7 @@
 cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["npm run build:server", "npm prune --omit=dev"]
+cmds = ["npm run build:server"]
+
+[start]
+cmd = "node dist/server-api.mjs"
