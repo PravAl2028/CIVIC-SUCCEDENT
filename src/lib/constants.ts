@@ -26,6 +26,10 @@ export interface Case {
   rejectedBy?: string[];
   complaintGenerated: boolean;
   complaintText?: string;
+  complaintLetter?: string;
+  subject?: string;
+  escalationPath?: string;
+  rtiQuery?: string;
   resolvedBy?: string | null;
   resolvedImageUrl?: string | null;
   rejectionImageUrl?: string | null;
@@ -43,13 +47,11 @@ export interface UserProfile {
   photoURL: string;
   xp: number;
   trustScore: number;
-  coins: number;
   city?: string;
   area?: string;
   homeLatitude?: number;
   homeLongitude?: number;
   homePinned?: boolean;
-  empireValuation?: number;
   rank: "Scout" | "Scout Elite" | "Patrol Ranger" | "Ranger Captain" | "City Guardian" | "Guardian Commander" | "Champion" | "Legend" | string;
   level?: number;
   totalReports: number;
@@ -80,11 +82,9 @@ export const INITIAL_USER: UserProfile = {
   photoURL: "https://lh3.googleusercontent.com/aida-public/AB6AXuDzrBenYNUT47en63o1y_TfD_aF_Mnm9eDpaA3M2TBWpjTExdrOWPw3rm54pLC2k-Its-f7jA1rz9du6QIxc0HzUCbMm51KUkI6epLuyJMiWEmIRKksC8Se05ch_wdrz_9MaMdIMV6Q47qMPBFvQvEf5IMN2UbcGpaaFNB1BWN4Yc4_7bnZ5tw_CLYazpxWmpLh9nPlhVLk_kc72BAFm_MnX2eK7F5omE2EC2sPzF1opuzdtyDeAj4KGK0V_A_ESjq4ckFM5QOKa1Cd",
   xp: 1250,
   trustScore: 88,
-  coins: 200,
   homeLatitude: 12.9348,
   homeLongitude: 77.6240,
   homePinned: true,
-  empireValuation: 200,
   rank: "Ranger",
   totalReports: 42,
   totalVerifications: 28,

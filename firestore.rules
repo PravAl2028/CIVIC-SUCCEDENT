@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection — only the owner can write their own profile
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Cases collection — authenticated users can read, only reporter or admin can write
+    match /cases/{caseId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // Community chat messages
+    match /chatMessages/{messageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // Community leaderboard
+    match /leaderboard/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

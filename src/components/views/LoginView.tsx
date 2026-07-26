@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../../firebase';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSignup: () => void, onGoHome: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const { t } = useLanguage();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,16 +26,16 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
           if (userDoc.email) {
             loginEmail = userDoc.email;
           } else {
-            setError('User does not have a registered email');
+            setError(t.auth.errors.noRegisteredEmail);
             return;
           }
         } else {
-          setError('Username not found');
+          setError(t.auth.errors.usernameNotFound);
           return;
         }
       } catch (dbErr) {
         console.error("Firestore username lookup error:", dbErr);
-        setError('Error checking username');
+        setError(t.auth.errors.errorCheckingUsername);
         return;
       }
     }
@@ -43,13 +45,13 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
       // App.tsx auth state listener will handle the rest
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password. Please try again.');
+        setError(t.auth.errors.invalidCredentials);
       } else if (err.code === 'auth/invalid-email') {
-        setError('Invalid email format');
+        setError(t.auth.errors.invalidEmailFormat);
       } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many unsuccessful login attempts. Please try again later.');
+        setError(t.auth.errors.tooManyRequests);
       } else {
-        setError(err.message?.replace('Firebase: ', '') || 'Login failed. Please check your credentials.');
+        setError(err.message?.replace('Firebase: ', '') || t.auth.errors.loginFailed);
       }
     }
   };
@@ -60,11 +62,11 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
         <div className="text-center mb-8">
           <h1 
             onClick={onGoHome}
-            className="font-display text-2xl font-black uppercase tracking-widest text-[#775a00] cursor-pointer hover:opacity-80 transition-opacity"
+            className="font-display text-2xl font-black uppercase tracking-widest text-[#006a65] cursor-pointer hover:opacity-80 transition-opacity"
           >
-            CIVIC SUCCEDENT
+            NAGARIKA
           </h1>
-          <p className="text-sm text-zinc-500 font-bold mt-2">Welcome back, hero</p>
+          <p className="text-sm text-zinc-500 font-bold mt-2">{t.auth.welcomeBack}</p>
         </div>
 
         {error && (
@@ -75,7 +77,7 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="block text-xs font-bold text-zinc-600 mb-1">Email or Username</label>
+            <label htmlFor="login-email" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.emailOrUsername}</label>
             <input
               id="login-email"
               name="email"
@@ -89,7 +91,7 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
+            <label htmlFor="login-password" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.passwordLabel}</label>
             <input
               id="login-password"
               name="password"
@@ -106,7 +108,7 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
             type="submit"
             className="w-full bg-[#006a65] text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-teal-700 transition-colors mt-2"
           >
-            LOGIN
+            {t.auth.login.toUpperCase()}
           </button>
         </form>
 
@@ -115,7 +117,7 @@ export default function LoginView({ onSwitchToSignup, onGoHome }: { onSwitchToSi
             onClick={onSwitchToSignup}
             className="text-xs font-bold text-zinc-500 hover:text-[#006a65]"
           >
-            Don't have an account? Sign Up
+            {t.auth.noAccountSignup}
           </button>
         </div>
       </div>

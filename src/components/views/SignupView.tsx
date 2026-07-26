@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
+import { useLanguage } from '../../context/LanguageContext';
 
 const CITY_DATA: Record<string, string[]> = {
   "Hyderabad": ["Tirumalagiri", "Secunderabad", "Ameerpet", "Kukatpally", "Gachibowli", "Madhapur", "Begumpet", "Banjara Hills", "Jubilee Hills", "Malkajgiri", "LB Nagar", "Dilsukhnagar", "Uppal", "Miyapur", "Kompally", "Mehdipatnam", "Tarnaka", "Habsiguda"],
@@ -19,6 +20,7 @@ const CITY_DATA: Record<string, string[]> = {
 };
 
 export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLogin: () => void, onGoHome: () => void }) {
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -44,16 +46,16 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
     e.preventDefault();
     setError('');
 
-    if (username.length < 3) return setError('Username must be at least 3 characters');
-    if (password.length < 6) return setError('Password must be at least 6 characters');
-    if (password !== confirmPassword) return setError('Passwords do not match');
+    if (username.length < 3) return setError(t.auth.errors.usernameLength);
+    if (password.length < 6) return setError(t.auth.errors.passwordLength);
+    if (password !== confirmPassword) return setError(t.auth.errors.passwordMismatch);
 
     setStep(2);
   };
 
   const handleAutoLocate = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      alert(t.auth.errors.geolocationNotSupported);
       return;
     }
     setSignupLoading(true);
@@ -62,7 +64,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         const { latitude, longitude } = position.coords;
         const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
         if (!geoapifyKey) {
-          setCustomAreaError("Location search unavailable. Please select an area from the list.");
+          setCustomAreaError(t.auth.errors.locationUnavailable);
           setSignupLoading(false);
           return;
         }
@@ -84,14 +86,14 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         setStep(3);
       } catch (e) {
         console.error("Auto locate failed", e);
-        setCustomAreaError("Auto-locate failed. Please select from the lists above.");
+        setCustomAreaError(t.auth.errors.autoLocateFailed);
       } finally {
         setSignupLoading(false);
       }
     }, (error) => {
       console.error(error);
       setSignupLoading(false);
-      alert("Could not access your location. Please select manually.");
+      alert(t.auth.errors.cannotAccessLocation);
     });
   };
 
@@ -183,7 +185,6 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         communityId: communityId,
         xp: 0,
         level: 1,
-        coins: 200,
         trustScore: 50,
         totalReports: 0,
         totalVerifications: 0,
@@ -219,7 +220,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
       window.location.replace("#patrol");
     } catch (err) {
       console.error("Error saving user data", err);
-      setError('Failed to save profile. Please try again.');
+      setError(t.auth.errors.saveProfile);
       setSignupLoading(false);
     }
   };
@@ -242,9 +243,9 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
       localStorage.setItem('temp_signup_phone', phone);
       await createAccountAndSave();
     } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') setError('Email is already registered');
-      else if (err.code === 'auth/invalid-email') setError('Invalid email format');
-      else setError(err.message || 'Signup failed');
+      if (err.code === 'auth/email-already-in-use') setError(t.auth.errors.emailRegistered);
+      else if (err.code === 'auth/invalid-email') setError(t.auth.errors.invalidEmail);
+      else setError(err.message || t.auth.errors.signupFailed);
       setSignupLoading(false);
     }
   };
@@ -261,12 +262,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         <div className="text-center mb-6">
           <h1
             onClick={onGoHome}
-            className="font-display text-2xl font-black uppercase tracking-widest text-[#775a00] cursor-pointer hover:opacity-80 transition-opacity"
+            className="font-display text-2xl font-black uppercase tracking-widest text-[#006a65] cursor-pointer hover:opacity-80 transition-opacity"
           >
-            CIVIC SUCCEDENT
+            NAGARIKA
           </h1>
           <p className="text-sm text-zinc-500 font-bold mt-2">
-            {step === 1 ? "Join your city's heroes" : step === 2 ? "Where are you located?" : "Ready to start!"}
+            {step === 1 ? t.auth.joinHeroes : step === 2 ? t.auth.whereLocated : t.auth.readyToStart}
           </p>
         </div>
 
@@ -279,7 +280,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         {step === 1 && (
           <form onSubmit={handleAccountSubmit} className="space-y-3">
             <div>
-              <label htmlFor="signup-username" className="block text-xs font-bold text-zinc-600 mb-1">Username</label>
+              <label htmlFor="signup-username" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.usernameLabel}</label>
               <input
                 id="signup-username"
                 name="username"
@@ -293,7 +294,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               />
             </div>
             <div>
-              <label htmlFor="signup-email" className="block text-xs font-bold text-zinc-600 mb-1">Email</label>
+              <label htmlFor="signup-email" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.emailLabel}</label>
               <input
                 id="signup-email"
                 name="email"
@@ -307,7 +308,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               />
             </div>
             <div>
-              <label htmlFor="signup-phone" className="block text-xs font-bold text-zinc-600 mb-1">Phone Number (optional)</label>
+              <label htmlFor="signup-phone" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.phoneLabel}</label>
               <input
                 id="signup-phone"
                 name="phone"
@@ -320,7 +321,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               />
             </div>
             <div>
-              <label htmlFor="signup-password" className="block text-xs font-bold text-zinc-600 mb-1">Password</label>
+              <label htmlFor="signup-password" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.passwordLabel}</label>
               <input
                 id="signup-password"
                 name="password"
@@ -334,7 +335,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               />
             </div>
             <div>
-              <label htmlFor="signup-confirm-password" className="block text-xs font-bold text-zinc-600 mb-1">Confirm Password</label>
+              <label htmlFor="signup-confirm-password" className="block text-xs font-bold text-zinc-600 mb-1">{t.auth.confirmPassword}</label>
               <input
                 id="signup-confirm-password"
                 name="confirmPassword"
@@ -351,7 +352,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               type="submit"
               className="w-full bg-[#006a65] text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-teal-700 transition-colors mt-4"
             >
-              NEXT — SELECT LOCATION
+              {t.auth.nextSelectLocation}
             </button>
           </form>
         )}
@@ -359,8 +360,8 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h2 className="font-display text-xl font-black mb-1">What area do you live in?</h2>
-              <p className="text-sm text-zinc-500">Choose your city and neighborhood</p>
+              <h2 className="font-display text-xl font-black mb-1">{t.auth.whatArea}</h2>
+              <p className="text-sm text-zinc-500">{t.auth.chooseCity}</p>
             </div>
 
             {!selectedCity ? (
@@ -370,12 +371,12 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                   disabled={signupLoading}
                   className="w-full bg-[#006a65] text-white py-3 rounded-xl font-bold text-sm hover:bg-teal-700 transition-colors shadow-sm flex items-center justify-center gap-2"
                 >
-                  {signupLoading ? "Locating..." : "📍 Auto-Locate Me"}
+                  {signupLoading ? t.auth.searching : t.auth.autoLocate}
                 </button>
 
                 <div className="relative flex items-center py-2">
                   <div className="flex-grow border-t border-zinc-200"></div>
-                  <span className="flex-shrink-0 mx-4 text-zinc-400 text-xs font-bold uppercase">Or choose manually</span>
+                  <span className="flex-shrink-0 mx-4 text-zinc-400 text-xs font-bold uppercase">{t.auth.orChooseManually}</span>
                   <div className="flex-grow border-t border-zinc-200"></div>
                 </div>
 
@@ -384,9 +385,9 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                   value={cityQuery}
                   onChange={(e) => { setCityQuery(e.target.value); if (e.target.value.trim().length >= 2) { searchCitySuggestions(e.target.value); } else { setCitySuggestions([]); } }}
                   className="w-full border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
-                  placeholder="Search for your city..."
+                  placeholder={t.auth.searchCity}
                 />
-                <p className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Popular Cities</p>
+                <p className="text-xs font-bold uppercase text-zinc-400 tracking-wider">{t.auth.popularCities}</p>
                 <div className="flex flex-wrap gap-2 max-h-[28vh] overflow-y-auto">
                   {Object.keys(CITY_DATA).filter(c => !cityQuery || c.toLowerCase().includes(cityQuery.toLowerCase())).map(city => (
                     <button
@@ -400,7 +401,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                 </div>
                 {citySuggestions.length > 0 && (
                   <div className="mt-1">
-                    <p className="text-xs font-bold uppercase text-zinc-400 tracking-wider mb-1">Other cities</p>
+                    <p className="text-xs font-bold uppercase text-zinc-400 tracking-wider mb-1">{t.auth.otherCities}</p>
                     <div className="flex flex-wrap gap-2">
                       {citySuggestions.filter(s => !Object.keys(CITY_DATA).includes(s)).map(city => (
                         <button
@@ -414,19 +415,19 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                     </div>
                   </div>
                 )}
-                {isSearchingCity && <p className="text-xs text-zinc-400 mt-1">Searching...</p>}
+                {isSearchingCity && <p className="text-xs text-zinc-400 mt-1">{t.auth.searching}</p>}
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-zinc-500">
-                    City: <span className="text-zinc-800">{selectedCity}</span>
+                    {t.auth.cityLabel} <span className="text-zinc-800">{selectedCity}</span>
                   </p>
                   <button
                     onClick={() => { setSelectedCity(''); setSelectedArea(''); setCustomArea(''); setCustomAreaSuggestions([]); setCustomAreaError(''); setAreaValidated(false); setCityQuery(''); setCitySuggestions([]); }}
                     className="text-xs text-zinc-400 hover:text-zinc-600"
                   >
-                    Change city →
+                    {t.auth.changeCity || "Change city →"}
                   </button>
                 </div>
 
@@ -435,7 +436,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                   disabled={signupLoading}
                   className="w-full bg-[#006a65] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-teal-700 transition-colors shadow-sm flex items-center justify-center gap-2"
                 >
-                  {signupLoading ? "Locating..." : "📍 Auto-Locate My Area"}
+                  {signupLoading ? t.auth.searching : t.auth.autoLocateArea}
                 </button>
 
                 <div className="flex flex-wrap gap-2 max-h-[30vh] overflow-y-auto">
@@ -452,7 +453,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
 
                 <div className="pt-4 border-t border-zinc-100">
                   <label className="block text-xs font-bold text-zinc-600 mb-1">
-                    Not listed? Search for your area (verified locations only):
+                    {t.auth.notListed}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -471,14 +472,14 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                       }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchAreaSuggestions(customAreaQuery); } }}
                       className="flex-1 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c040]/50"
-                      placeholder="Type area name to search..."
+                      placeholder={t.auth.typeAreaSearch}
                     />
                     <button
                       onClick={() => searchAreaSuggestions(customAreaQuery)}
                       disabled={isSearchingArea || customAreaQuery.trim().length < 3}
                       className="bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 whitespace-nowrap"
                     >
-                      {isSearchingArea ? '...' : 'Search'}
+                      {isSearchingArea ? '...' : t.common.search}
                     </button>
                   </div>
                   {customAreaError && (
@@ -503,7 +504,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
                 </div>
 
                 <button onClick={() => setSelectedCity('')} className="text-xs text-zinc-400 hover:text-zinc-600 block">
-                  ← Back to city selection
+                  ← {t.auth.backToCitySelection || "Back to city selection"}
                 </button>
               </div>
             )}
@@ -517,9 +518,9 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             </div>
 
             <div>
-              <h2 className="font-display text-2xl font-black uppercase text-[#006a65]">You're joining</h2>
-              <p className="text-xl font-bold mt-1">{selectedCity.toUpperCase()} COMMUNITY</p>
-              <p className="text-sm text-zinc-500 mt-2">Area: {customArea || selectedArea}</p>
+              <h2 className="font-display text-2xl font-black uppercase text-[#006a65]">{t.auth.youreJoining}</h2>
+              <p className="text-xl font-bold mt-1">{selectedCity.toUpperCase()} {t.auth.community}</p>
+              <p className="text-sm text-zinc-500 mt-2">{t.auth.areaLabel} {customArea || selectedArea}</p>
             </div>
 
             <button
@@ -527,11 +528,11 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
               disabled={signupLoading}
               className="w-full bg-[#006a65] text-white py-4 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-teal-700 transition-colors shadow-lg"
             >
-              {signupLoading ? "CREATING ACCOUNT..." : "CREATE ACCOUNT & START PATROLLING"}
+              {signupLoading ? t.auth.creatingAccount : t.auth.createAccount}
             </button>
 
             <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600 mt-4 block mx-auto">
-              ← Change area
+              ← {t.auth.changeArea || "Change area"}
             </button>
           </div>
         )}
@@ -541,7 +542,7 @@ export default function SignupView({ onSwitchToLogin, onGoHome }: { onSwitchToLo
             onClick={onSwitchToLogin}
             className="text-xs font-bold text-zinc-500 hover:text-[#006a65]"
           >
-            Already have an account? Login
+            {t.auth.hasAccountLogin}
           </button>
         </div>
       </div>

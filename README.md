@@ -1,7 +1,7 @@
-# Civic Succedent
+# Nagarika
 **Submission for the Hack the Limit Hackathon**  
 
-Gamifying citizen-led infrastructure reporting with multi-agent AI verification and real-time safe-route navigation.
+A community issue reporting and resolution platform with multilingual support, RAG agents, and civic engagement.
 
 ---
 
@@ -13,7 +13,7 @@ Gamifying citizen-led infrastructure reporting with multi-agent AI verification 
 
 ## 🎥 Demo Video
 
-Watch the full walkthrough demonstrating Civic Succedent's live navigation routing, HQ gameplay, and multi-agent AI verification system:
+Watch the full walkthrough demonstrating Nagarika's multi-agent AI verification system, multilingual support, and civic issue resolution pipeline:
 
 [![Watch Demo Video](https://img.shields.io/badge/Watch%20Demo%20Video-red?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/KM1cv3nBvdQ)
 
@@ -24,9 +24,9 @@ To test the application across different permission levels and roles, use the pr
 
 | Role | Username / Email | Password | Details |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin_civic_succedent` | `123456` | Accesses the Admin Control Panel, chats audit, and locks/unblocks flagged users. |
-| **User 1** | `Leo` | `123456` | Active Scout (Ranger rank) with established HQ Empire and active cases. |
-| **User 2** | `Jerry` | `098765` | Active Scout. |
+**Admin** | `admin_civic_succedent` | `123456` | Accesses the Admin Control Panel, chat audit, and locks/unblocks flagged users. |
+| **User 1** | `Leo` | `123456` | Active citizen with reports and verifications. |
+| **User 2** | `Jerry` | `098765` | Active citizen. |
 ---
 
 ## 📋 Walkthrough of Core Application Features
@@ -34,34 +34,34 @@ To test the application across different permission levels and roles, use the pr
 Below is a detailed walkthrough of the application's core features and user flows:
 
 ### 1. Landing Page
-The portal homepage highlighting the Gemini Camera Inspector and real-time civic mission entry.
+The portal homepage highlighting the citizen reporting platform and real-time civic issue entry.
 
-### 2. Main Patrol Dashboard & Defect Detector
-The primary interface showing the real-time map, current scout location, active hazard warning markers, and coordinate HUD.
+### 2. Dashboard
+The primary interface showing active issues, recent reports, civic points, and quick action tiles.
 
-### 3. Safe Navigation Route Planner
-Bypass routing controls allowing scouts to dynamically plan routes that completely avoid active hazard zones.
+### 3. Issue Reporting
+Report civic issues via camera scan with AI-powered damage classification and severity scoring.
 
-### 4. Route Preferences (Safest vs. Fastest)
-Selection panel for routing preferences showing the avoided hazard details and safety index score.
+### 4. Issue Feed
+Scrollable list of active and resolved issues with category and severity filters.
 
-### 5. Turn-by-Turn GPS Navigation HUD
-Active turn-by-turn guidance mode with a real-time speedometer, guidance banners, and reporting integration.
+### 5. Community Map
+Interactive Leaflet map showing all reported issues with category and severity filters.
 
-### 6. Gamified Empire Builder (HQ Simulation)
-The Headquarters building interface showing the scout's base, valuation counters, and neighboring scouts' bases.
+### 6. AI Complaint Generation
+When 2+ citizens verify a report, the Dispatcher Agent generates a formal municipal complaint letter.
 
 ### 7. Local Community Chat Lounge
-Active community lounge for Hyderabad showing localized warnings, reports, and AI-moderated chat logs.
+Active community lounge showing localized warnings, reports, and AI-moderated chat logs.
 
-### 8. Scout Profile & Rewards Hub
-Profile dashboard showing total XP, reports filed, resolves statistics, rewards scratching history, and seed control.
+### 8. Citizen Profile & Civic Points
+Profile dashboard showing civic points, reports filed, resolves statistics, and language settings.
 
-### 9. AI Agent Configuration Console
-Admin control panel for configuring Gemini model engine models (Scanner, Dispatcher, Resolver, Moderator) in real-time.
+### 9. AI Agent Configuration
+Admin control panel for configuring Gemini model engines (Scanner, Dispatcher, Resolver, Moderator) in real-time.
 
-### 10. Admin User Management & Dispatch Log
-Admin user moderation tools, warning audit logs, and dispatched municipal letters history.
+### 10. Analytics & Leaderboard
+Analytics dashboard with community health charts and a civic contribution leaderboard.
 
 ---
 
@@ -69,53 +69,54 @@ Admin user moderation tools, warning audit logs, and dispatched municipal letter
 Civic infrastructure damage — potholes, water leaks, broken streetlights — routinely goes unreported. Existing channels are fragmented, slow, and provide no incentives for community action. At the same time, pedestrians and riders have no real-time way to know which routes are actually safe until they navigate straight into active hazards.
 
 ## 💡 The Solution
-Civic Succedent turns spotting a hazard into a rewarding game loop:
+Nagarika turns spotting a hazard into a civic contribution:
 1. **Scan** the hazard with your phone camera.
-2. Let a **Gemini-powered multi-agent pipeline** verify and score it.
-3. Once the community consensus verifies the report, the app **automatically reroutes pedestrians and riders** around the hazard in real-time.
+2. Let a **Gemini-powered multi-agent pipeline** verify and classify it.
+3. Once verified, the app **automatically generates a formal complaint letter** and provides escalation guidance.
 
 ---
 
 ## 🎮 How It Works
 
-### 1. Patrol & Detect
-Scout on foot with real-time GPS tracking or switch to the **on-screen virtual joystick simulator** to explore anywhere. Either mode sweeps a 30-meter proximity radius for nearby unverified reports. The in-app camera captures the hazard on the spot. Each new report earns **+50 XP**.
+### 1. Report & Detect
+Report civic issues with your phone camera. Each new report earns **+10 Civic Points**.
 
 ### 2. AI Appraisal
-A server-side **Gemini Scanner Agent** analyzes uploaded images. It confirms the photo shows a genuine outdoor civic hazard (not household clutter) and assigns a severity score (1–10). Full community consensus requires 3 neighborhood approval votes.
+A server-side **Gemini Scanner Agent** analyzes uploaded images. It confirms the photo shows a genuine outdoor civic hazard and assigns a severity score (1-10). Full community consensus requires 2 verification votes.
 
-### 3. Safe Navigation
-Confirmed hazards feed directly into a live **OSRM (Open Source Routing Machine) engine** that reroutes pedestrians and riders around active defect coordinates. The system includes custom route toggles designed specifically for kids, seniors, cyclists, and riders.
+### 3. Community Consensus
+Connect with neighborhood citizens inside an AI-moderated chat lounge. A **Moderator Agent** filters chat spam and toxic messages. Two or more verifications trigger an automated official complaint draft.
 
-### 4. HQ Empire
-Manage your municipal base to generate passive offline coin income! Players can build and upgrade the **Base Cabin**, **Solar Grid Array**, and **Repair Depot Wing** (each Level 1–3) to compound offline yields, earning up to **~285 coins/hour** at max level.
-- At **User Level 3**, scouts unlock the ability to relocate their home base for 500 Coins to a new, non-overlapping location on the public map.
+### 4. Complaint Generation
+When a report receives 2+ citizen verifications, the **Dispatcher Agent** generates a formal government complaint letter with RTI query templates and escalation guidance.
 
-### 5. Community Consensus
-Connect with neighborhood scouts inside an AI-moderated chat lounge. A **Moderator Agent** filters chat spam and toxic messages with a 3-strike penalty. Verifying reported hazards or building updates automatically logs activity in the chat. Two or more verifications trigger an automated official complaint draft.
-
-### 6. Reward Loop
-Spend your earned Civic Coins on digital **Scratch Cards** to win simulated vouchers, badges, or profile cosmetics (100% in-game fun only).
+### 5. Issue Resolution
+Resolve verified issues by submitting before/after photos. The **Resolver Agent** confirms resolution and awards **+25 Civic Points**.
 
 ---
 
 ## 🤖 Multi-Agent AI Pipeline
-Four Gemini-powered server-side agents handle the moderation, validation, and economy mechanics of the application:
+Seven Gemini-powered server-side agents handle the validation, classification, and guidance of the application:
 
 | Agent | Role Tag | Description / What It Does |
 | :--- | :--- | :--- |
 | **Scanner** | `Visual Inspector` | Analyzes uploaded camera snapshots, validates that it shows public outdoor damage, flags duplicates, and rates severity (1-10). |
-| **Moderator** | `Quality Guardian` | Audits community chat logs, filters toxic contents, and tracks neighborhood consensus votes. |
-| **Dispatcher** | `Alert Architect` | Geocodes coordinates, formats case files, and drafts official municipal complaint letters when a case receives 2+ verifications. |
-| **Resolver** | `Economy Director` | Reviews "before" vs "after" repair photos to confirm resolution, updates user levels/XP, and calculates offline HQ coin yields. |
+| **Moderator** | `Quality Guardian` | Audits community chat logs, filters toxic content, and tracks neighborhood consensus votes. |
+| **Dispatcher** | `Alert Architect` | Drafts official municipal complaint letters with RTI queries when a case receives 2+ verifications. |
+| **Resolver** | `Resolution Verifier` | Reviews "before" vs "after" repair photos to confirm resolution and awards civic points. |
+| **Classifier** | `Issue Classifier` | Classifies issues into categories and scores severity using RAG knowledge context. |
+| **Router** | `Department Router` | Recommends the specific municipal authority to contact with escalation timelines. |
+| **Insights** | `Data Analyst` | Aggregates ward-level issue data and drafts civic action plans. |
 
 ---
 
 ## 🛠️ Technical Stack
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Leaflet.js, Motion, Lucide Icons.
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Leaflet.js, Recharts, Lucide Icons.
 - **Backend API**: Node.js, Express.
 - **Database & Auth**: Firebase Auth and Cloud Firestore (real-time listeners).
-- **APIs & SDKs**: Google GenAI SDK (`@google/genai`), Geoapify Geocoding API, OSRM.
+- **APIs & SDKs**: Google GenAI SDK (`@google/genai`), Geoapify Geocoding API.
+- **i18n**: English, Hindi (हिंदी), Telugu (తెలుగు) with LanguageContext.
+- **RAG**: Local knowledge base (government departments, RTI templates, legal rights, government schemes).
 
 
 

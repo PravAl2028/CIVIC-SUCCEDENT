@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const SCANNER_SYSTEM_PROMPT = `You are the Scanner Agent for Civic Succedent, a civic infrastructure monitoring platform.
+const SCANNER_SYSTEM_PROMPT = `You are the Scanner Agent for Nagarika, a civic infrastructure monitoring platform.
 
 Your job is to analyze a photo taken by a citizen and determine:
 1. Is this a real, primary, direct photo of outdoor/public civic infrastructure or urban space damage? (potholes, pavement/footpath cracks, water pipe leaks on roads/sidewalks, broken municipal streetlights, illegal public garbage dumps, public road waterlogging, broken public safety railings/fences/bollards).

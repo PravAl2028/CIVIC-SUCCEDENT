@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { buildRAGPrompt } from "../lib/rag";
 
-const DISPATCHER_SYSTEM_PROMPT = `You are the Dispatcher Agent for Civic Succedent.
+const DISPATCHER_SYSTEM_PROMPT = `You are the Dispatcher Agent for Nagarika.
 
 Your job is to generate a FORMAL GOVERNMENT COMPLAINT LETTER based on a verified civic damage report.
 
@@ -103,9 +104,10 @@ function getDispatcherFallback(caseData: any, apiErrorMsg: string = "No valid GE
   const resolvedType = (caseData.damageType || "pothole").replace("_", " ").toUpperCase();
   const lat = caseData.lat || caseData.latitude || "N/A";
   const lng = caseData.lng || caseData.longitude || "N/A";
+  const ragContext = buildRAGPrompt(caseData.damageType, caseData.city || "Hyderabad", caseData.severity || 5, caseData.address || "", caseData.id || "");
   return {
     subject: `Immediate repair of ${resolvedType.toLowerCase()} at ${caseData.address || "local neighborhood road"}`,
-    complaintLetter: `TO:
+    complaintLetter: `RAG Knowledge Context:\n${ragContext}\n\n---\n\nCase Details:\nTO:
 The Municipal Commissioner,
 Municipal Corporation Office,
 ${caseData.city || "Secunderabad"} Division.
@@ -127,7 +129,7 @@ We kindly and professionally request your team to look into this matter at your 
 Thank you very much for your hard work and dedication to our community.
 
 Sincerely,
-Civic Succedent Neighborhood Patrol
+Nagarika Neighborhood Patrol
 (Reference Code: ${caseData.id})`,
     escalationPath: "Escalation to the Ward Assistant Commissioner if unresolved within 30 days.",
     rtiQuery: "Under Section 6(1) of the Right to Information Act, please provide a status report on actions taken regarding this road maintenance request.",
@@ -150,7 +152,9 @@ export async function runDispatcherAgent(caseData: any, selectedModel?: string, 
 
   const activeModel = selectedModel || process.env.GEMINI_DISPATCHER_MODEL || "gemma-4-26b-a4b-it";
 
-  let prompt = `Generate a gentle, simple-language formal government complaint with a 'TO' address block for this civic issue:
+  const ragContext = buildRAGPrompt(caseData.damageType, caseData.city || "Hyderabad", caseData.severity || 5, caseData.address || "", caseData.id || "");
+
+  let prompt = `RAG Knowledge Context:\n${ragContext}\n\n---\n\nCase Details:\nGenerate a gentle, simple-language formal government complaint with a 'TO' address block for this civic issue:
     
 Case ID: ${caseData.id}
 Type: ${caseData.damageType}

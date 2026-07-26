@@ -1,1827 +1,248 @@
-import React, { useEffect, useState, useRef } from "react";
-import { Compass, Users, User, ArrowLeft, RefreshCw, Sparkles, MessageSquare, ExternalLink, Map, Shield, Trophy, Award } from "lucide-react";
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, collection, query, where, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './firebase';
-
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { LanguageProvider, useLanguage } from "./context/LanguageContext";
+import LandingView from "./components/views/LandingView";
 import LoginView from "./components/views/LoginView";
 import SignupView from "./components/views/SignupView";
-
-import LandingView from "./components/views/LandingView";
 import GameView from "./components/views/GameView";
-import ProfileView from "./components/views/ProfileView";
-import CommunityView from "./components/views/CommunityView";
-import ScanResultView from "./components/views/ScanResultView";
 import RoutePlannerView from "./components/views/RoutePlannerView";
+import CommunityView from "./components/views/CommunityView";
 import AdminView from "./components/views/AdminView";
-import CameraCapture from "./components/camera/CameraCapture";
-import ScratchCard from "./components/rewards/ScratchCard";
-import { Case, UserProfile, Hood } from "./lib/constants";
-
-type ViewState = "login" | "signup" | "landing" | "game" | "profile" | "community" | "scanner_result" | "route_planner" | "admin";
-
-const API_BASE = (import.meta as any).env.VITE_API_URL || "";
-
-const LEVEL_UP_REWARDS_MAP: Record<number, {
-  rank: string;
-  coinsBonus: number;
-  trustBonus: number;
-  couponName: string;
-  couponCode: string;
-  tier: string;
-}> = {
-  2: {
-    rank: "Scout Elite",
-    coinsBonus: 100,
-    trustBonus: 5,
-    couponName: "₹20 Chai Point Voucher",
-    couponCode: "CIVIC-CHAI20",
-    tier: "Silver"
-  },
-  3: {
-    rank: "Patrol Ranger",
-    coinsBonus: 200,
-    trustBonus: 5,
-    couponName: "10% Off Clean-Green Store",
-    couponCode: "CIVIC-ECO10",
-    tier: "Gold"
-  },
-  4: {
-    rank: "Ranger Captain",
-    coinsBonus: 300,
-    trustBonus: 5,
-    couponName: "₹50 Local Cafe Discount",
-    couponCode: "CIVIC-CAFE50",
-    tier: "Platinum"
-  },
-  5: {
-    rank: "City Guardian",
-    coinsBonus: 500,
-    trustBonus: 10,
-    couponName: "1 Month Free Eco-Transit Pass",
-    couponCode: "CIVIC-TRANSIT",
-    tier: "Diamond"
-  },
-  6: {
-    rank: "Guardian Commander",
-    coinsBonus: 750,
-    trustBonus: 10,
-    couponName: "₹200 Amazon Gift Voucher",
-    couponCode: "CIVIC-AMZN200",
-    tier: "Diamond"
-  },
-  7: {
-    rank: "Champion",
-    coinsBonus: 1000,
-    trustBonus: 10,
-    couponName: "₹500 BookMyShow Voucher",
-    couponCode: "CIVIC-SHOW500",
-    tier: "Diamond"
-  },
-  8: {
-    rank: "Legend",
-    coinsBonus: 2000,
-    trustBonus: 20,
-    couponName: "₹1000 Department Store Gift Card",
-    couponCode: "CIVIC-LEGEND",
-    tier: "Diamond"
-  }
-};
-
-export default function App() {
-  const [view, setView] = useState<ViewState>("landing");
-  const [initialLeaderboardOpen, setInitialLeaderboardOpen] = useState(false);
-
-  const [levelUpData, setLevelUpData] = useState<{
-    level: number;
-    rank: string;
-    coinsBonus: number;
-    trustBonus: number;
-    couponName: string;
-    couponCode: string;
-    tier: string;
-  } | null>(null);
-
-  
-  // Patrol Coordinate state - Koramangala Bangalore
-  const [playerPos, setPlayerPos] = useState({ lat: 20.5937, lng: 78.9629 });
-
-  // Core full-stack state
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [cases, setCases] = useState<Case[]>([]);
-  const [hood, setHood] = useState<Hood | null>(null);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [liveActivities, setLiveActivities] = useState<any[]>([]);
-  const [selectedCaseIdFromChat, setSelectedCaseIdFromChat] = useState<string | null>(null);
-  
-  // Loading transitions
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [scanResultLoading, setScanResultLoading] = useState(false);
-  const [notification, setNotification] = useState<{ message: string; type: "success" | "info" } | null>(null);
-
-  // Active overlays / flow state
-  const [activeCameraOpen, setActiveCameraOpen] = useState(false);
-  const [capturedImageBase64, setCapturedImageBase64] = useState("");
-  const [scannerResult, setScannerResult] = useState<any>(null);
-  const [scratchReward, setScratchReward] = useState<any>(null);
-  const [returnView, setReturnView] = useState<ViewState | null>(null);
-  const [agentModels, setAgentModels] = useState<{
-    scanner: string;
-    dispatcher: string;
-    resolver: string;
-    moderator: string;
-  }>(() => {
-    try {
-      const saved = localStorage.getItem("civic_succedent_agent_models_v2");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    const legacyModel = localStorage.getItem("civic_succedent_selected_model") || "gemini-3.1-flash-lite";
-    const defaultModel = legacyModel === "gemini-2.5-flash" ? "gemini-3.1-flash-lite" : legacyModel;
-    return {
-      scanner: defaultModel,
-      dispatcher: defaultModel,
-      resolver: defaultModel,
-      moderator: defaultModel
-    };
-  });
-
-  // Resolution comparison flow states
-  const [isResolveFlow, setIsResolveFlow] = useState(false);
-  const [isRejectionFlow, setIsRejectionFlow] = useState(false);
-  const [activeResolveCaseId, setActiveResolveCaseId] = useState<string | null>(null);
-  const [showReconstructionOffer, setShowReconstructionOffer] = useState(false);
-
-  // Active dispatcher overlay
-  const [activeDispatchCase, setActiveDispatchCase] = useState<Case | null>(null);
-  const [dispatchLoading, setDispatchLoading] = useState(false);
-  const [dispatchLetter, setDispatchLetter] = useState<any>(null);
-
-  const [authUser, setAuthUser] = useState<any>(null);
-
-  // Listen to hash changes for all pages
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (initialLoading) return;
-
-      const hash = window.location.hash.replace("#", "").replace("/", "");
-      
-      let targetView: ViewState = "landing";
-      if (hash === "login") targetView = "login";
-      else if (hash === "signup") targetView = "signup";
-      else if (hash === "patrol" || hash === "game") targetView = "game";
-      else if (hash === "maps" || hash === "route_planner") targetView = "route_planner";
-      else if (hash === "community") targetView = "community";
-      else if (hash === "profile") targetView = "profile";
-      else if (hash === "admin") targetView = "admin";
-      else if (hash === "scanner_result") targetView = "scanner_result";
-
-      // Auth validation redirect logic
-      if (!auth.currentUser) {
-        if (targetView !== "login" && targetView !== "signup" && targetView !== "landing") {
-          window.location.replace("#");
-          setView("landing");
-          return;
-        }
-      } else {
-        if (targetView === "login" || targetView === "signup") {
-          window.location.replace("#patrol");
-          setView("game");
-          return;
-        }
-        if (targetView === "admin" && !user?.isAdmin) {
-          window.location.replace("#patrol");
-          setView("game");
-          return;
-        }
-      }
-
-      setView(targetView);
-    };
-
-    window.addEventListener("hashchange", handleHashChange);
-    
-    // Initial parse
-    handleHashChange();
-
-    return () => {
-      window.removeEventListener("hashchange", handleHashChange);
-    };
-  }, [initialLoading, authUser, user]);
-
-  // Handle map resizing layout fixes when active view changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.dispatchEvent(new Event("resize"));
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [view]);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      if (!authUser) {
-        setAuthUser(null);
-        setUser(null);
-        setHood(null);
-        setPlayerPos({ lat: 20.5937, lng: 78.9629 });
-        setSelectedCaseIdFromChat(null);
-        const hash = window.location.hash.replace("#", "").replace("/", "");
-        if (hash !== "login" && hash !== "signup") {
-          window.location.replace("#");
-          setView("landing");
-        }
-        setInitialLoading(false);
-      } else {
-        setAuthUser(authUser);
-        const hash = window.location.hash.replace("#", "").replace("/", "");
-        const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-        if (!userDoc.exists()) {
-          if (hash !== "signup") {
-            window.location.replace("#");
-            setView("landing");
-          }
-          setInitialLoading(false);
-        } else {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                const { latitude, longitude } = position.coords;
-                setPlayerPos({ lat: latitude, lng: longitude });
-              },
-              (geoErr) => console.log("Startup geolocation check skipped or denied:", geoErr.message),
-              { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
-            );
-          }
-          
-          let targetView: ViewState = "game";
-          if (hash === "maps" || hash === "route_planner") targetView = "route_planner";
-          else if (hash === "community") targetView = "community";
-          else if (hash === "profile") targetView = "profile";
-          else if (hash === "admin") targetView = "admin";
-          
-          const targetHash = targetView === "game" ? "patrol" : (targetView === "route_planner" ? "maps" : targetView);
-          window.location.replace(`#${targetHash}`);
-          setView(targetView);
-        }
-      }
-    }, (error) => {
-      console.error("Auth state change error:", error);
-      setAuthUser(null);
-      window.location.replace("#");
-      setView("landing");
-      setInitialLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Listen to Firestore for user data
-  useEffect(() => {
-    if (!authUser) return;
-    let unsubHood: (() => void) | null = null;
-    
-    const unsubscribe = onSnapshot(doc(db, 'users', authUser.uid), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setUser({
-          userId: data.uid,
-          displayName: data.username,
-          email: data.email || '',
-          rank: computeRank(data.xp, data.trustScore).label,
-          xp: data.xp || 0,
-          coins: data.coins || 0,
-          level: data.level || 1,
-          homeLatitude: data.homeLatitude,
-          homeLongitude: data.homeLongitude,
-          homePinned: data.homePinned || false,
-          empireValuation: data.empireValuation || 0,
-          photoURL: data.avatarUrl || "https://api.dicebear.com/9.x/avataaars/svg?seed=" + data.username,
-          trustScore: data.trustScore || 50,
-          city: data.city || "Hyderabad",
-          area: data.area || "",
-          totalReports: data.totalReports || 0,
-          totalVerifications: data.totalVerifications || 0,
-          totalResolves: data.totalResolved || 0,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : '',
-          warningsCount: data.warningsCount || 0,
-          badges: data.badges || [],
-          isAdmin: data.isAdmin || false,
-          isBlocked: data.isBlocked || false
-        });
-
-        // Clean up previous community listener if communityId changes
-        if (unsubHood) {
-          unsubHood();
-          unsubHood = null;
-        }
-
-        // Subscribing to the community document in real-time
-        if (data.communityId) {
-          const hoodRef = doc(db, 'communities', data.communityId);
-          unsubHood = onSnapshot(hoodRef, (hoodSnap) => {
-            if (hoodSnap.exists()) {
-              const hData = hoodSnap.data();
-              setHood({
-                id: hData.communityId,
-                name: hData.name,
-                city: hData.city,
-                healthScore: hData.healthScore || 100,
-                totalCases: hData.totalCases || 0,
-                resolvedCases: hData.resolvedCases || 0,
-                activeHeroes: hData.memberCount || 1
-              });
-            } else {
-              setHood({
-                id: data.communityId,
-                name: "Local Community",
-                city: "Unknown",
-                healthScore: 100,
-                totalCases: 0,
-                resolvedCases: 0,
-                activeHeroes: 1
-              });
-            }
-          });
-        } else {
-          // Fallback if user doesn't have communityId
-          setHood({
-            id: "default_hood",
-            name: "Global Community",
-            city: "Global",
-            healthScore: 100,
-            totalCases: 0,
-            resolvedCases: 0,
-            activeHeroes: 1
-          });
-        }
-      }
-    });
-    return () => {
-      unsubscribe();
-      if (unsubHood) unsubHood();
-    };
-  }, [authUser]);
-
-  // We need computeRank helper inside App
-  function computeRank(xp: number, trustScore: number) {
-    if (xp >= 10000) return { rank: 'legend', label: 'LEGEND' };
-    if (xp >= 7000) return { rank: 'champion', label: 'CHAMPION' };
-    if (xp >= 5000) return { rank: 'guardian_commander', label: 'GUARDIAN COMMANDER' };
-    if (xp >= 3500) return { rank: 'city_guardian', label: 'CITY GUARDIAN' };
-    if (xp >= 2200) return { rank: 'ranger_captain', label: 'RANGER CAPTAIN' };
-    if (xp >= 1200) return { rank: 'patrol_ranger', label: 'PATROL RANGER' };
-    if (xp >= 500) return { rank: 'scout_elite', label: 'SCOUT ELITE' };
-    return { rank: 'scout', label: 'SCOUT' };
-  }
-
-  const checkLevelUp = async (uid: string, userData: any, newXp: number, currentLevel: number) => {
-    let newLevel = 1;
-    if (newXp >= 10000) newLevel = 8;
-    else if (newXp >= 7000) newLevel = 7;
-    else if (newXp >= 5000) newLevel = 6;
-    else if (newXp >= 3500) newLevel = 5;
-    else if (newXp >= 2200) newLevel = 4;
-    else if (newXp >= 1200) newLevel = 3;
-    else if (newXp >= 500) newLevel = 2;
-
-    if (newLevel > currentLevel) {
-      const levelUpRewards = LEVEL_UP_REWARDS_MAP[newLevel];
-      if (!levelUpRewards) return;
-
-      try {
-        const { doc, updateDoc, increment, setDoc } = await import('firebase/firestore');
-
-        const currentTrust = userData.trustScore || 50;
-        const newTrust = Math.min(100, Math.max(0, currentTrust + levelUpRewards.trustBonus));
-
-        // 1. Award coins and trust score bonuses directly to the user document
-        await updateDoc(doc(db, 'users', uid), {
-          coins: increment(levelUpRewards.coinsBonus),
-          trustScore: newTrust,
-          level: newLevel
-        });
-
-        // 2. Add the corresponding Commercial Coupon to subcollection users/{uid}/rewards
-        const couponRewardObj = {
-          id: "lvl_coupon_" + newLevel + "_" + Date.now(),
-          tier: levelUpRewards.tier,
-          coupon: levelUpRewards.couponName,
-          couponCode: levelUpRewards.couponCode,
-          scratched: true, // Unlocked directly
-          couponRedeemed: false,
-          message: `Level ${newLevel} (${levelUpRewards.rank}) Reward!`,
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'users', uid, 'rewards', couponRewardObj.id), couponRewardObj);
-
-        // 3. Set levelUpData to show the Level Up overlay
-        setLevelUpData({
-          level: newLevel,
-          rank: levelUpRewards.rank,
-          coinsBonus: levelUpRewards.coinsBonus,
-          trustBonus: levelUpRewards.trustBonus,
-          couponName: levelUpRewards.couponName,
-          couponCode: levelUpRewards.couponCode,
-          tier: levelUpRewards.tier
-        });
-      } catch (err) {
-        console.error("Error during level up processing:", err);
-      }
-    }
-  };
-
-  const lastRankRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (user?.rank) {
-      if (lastRankRef.current && lastRankRef.current !== user.rank) {
-        // User ranked up! Let's post to the community chat.
-        const postRankUp = async () => {
-          try {
-            const userSnap = await getDoc(doc(db, 'users', user.userId));
-            const userData = userSnap.data();
-            if (userData?.communityId) {
-              await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-                senderId: "system_ai",
-                senderName: "CS AI-agent",
-                senderAvatar: "https://api.dicebear.com/9.x/bottts/svg?seed=cs_ai",
-                text: `🏆 Level Up Alert! Congratulations to @${user.displayName} on ranking up to ${user.rank}! Keep making your neighborhood safer!`,
-                type: "auto_post",
-                createdAt: serverTimestamp()
-              });
-            }
-          } catch (e) {
-            console.error("Failed to post rank up message:", e);
-          }
-        };
-        postRankUp();
-      }
-      lastRankRef.current = user.rank;
-    }
-  }, [user?.rank]);
-
-  // Listen to cases
-  useEffect(() => {
-    if (!authUser) return;
-    const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fbCases = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
-      setCases(fbCases);
-      setInitialLoading(false); // we can stop loading once cases load
-    });
-    return () => unsubscribe();
-  }, [authUser]);
-
-  // Listen to user's empire buildings
-  const [empire, setEmpire] = useState<any[]>([]);
-  useEffect(() => {
-    if (!authUser) {
-      setEmpire([]);
-      return;
-    }
-    const q = collection(db, `users/${authUser.uid}/empire`);
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const buildings = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setEmpire(buildings);
-    });
-    return () => unsubscribe();
-  }, [authUser]);
-
-  // Listen to other users' bases
-  const [publicBases, setPublicBases] = useState<any[]>([]);
-  useEffect(() => {
-    if (!authUser) {
-      setPublicBases([]);
-      return;
-    }
-    const q = query(
-      collection(db, "users"),
-      where("homePinned", "==", true)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const bases = snapshot.docs.map(docSnap => {
-        const d = docSnap.data();
-        return {
-          uid: docSnap.id,
-          username: d.username || "Scout",
-          homeLatitude: d.homeLatitude,
-          homeLongitude: d.homeLongitude,
-          isAdmin: d.isAdmin || false,
-          empireValuation: d.empireValuation || 200,
-          baseLevel: d.baseLevel || 1,
-          solarGridLevel: d.solarGridLevel || 0,
-          repairDepotLevel: d.repairDepotLevel || 0,
-          techLabLevel: d.techLabLevel || 0,
-          ecoCruiserLevel: d.ecoCruiserLevel || 0,
-          heroStatueLevel: d.heroStatueLevel || 0,
-          city: d.city || "Hyderabad",
-          area: d.area || "",
-          avatarUrl: d.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${d.username}`
-        };
-      });
-      setPublicBases(bases);
-    });
-    return () => unsubscribe();
-  }, [authUser]);
-
-  const handleEstablishHQ = async (lat: number, lng: number) => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    try {
-      const { doc, updateDoc, setDoc } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'users', uid), {
-        homeLatitude: lat,
-        homeLongitude: lng,
-        homePinned: true,
-        coins: 200,
-        empireValuation: 200,
-        baseLevel: 1,
-        solarGridLevel: 0,
-        repairDepotLevel: 0,
-        techLabLevel: 0,
-        ecoCruiserLevel: 0,
-        heroStatueLevel: 0
-      });
-      // Create initial HQ base Details
-      const hqDetailsId = "hq_details";
-      await setDoc(doc(db, `users/${uid}/empire`, hqDetailsId), {
-        id: hqDetailsId,
-        type: "hq_base",
-        baseLevel: 1,
-        solarGridLevel: 0,
-        repairDepotLevel: 0,
-        techLabLevel: 0,
-        ecoCruiserLevel: 0,
-        heroStatueLevel: 0,
-        valuation: 200,
-        latitude: lat,
-        longitude: lng,
-        builtAt: new Date().toISOString(),
-        lastClaimedAt: new Date().toISOString()
-      });
-      triggerToast("Welcome Commander! Your Civic Headquarters has been established.", "success");
-    } catch (err) {
-      console.error("Failed to establish HQ:", err);
-      triggerToast("Could not save headquarters position.", "info");
-    }
-  };
-
-  const handleCollectIncome = async (buildingId: string) => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    try {
-      const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
-      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
-      const hqSnap = await getDoc(hqRef);
-      if (!hqSnap.exists()) {
-        triggerToast("No active headquarters details found.", "info");
-        return;
-      }
-      const hqData = hqSnap.data();
-
-      const baseLvl = hqData.baseLevel || 1;
-      const solarLvl = hqData.solarGridLevel || 0;
-      const repairLvl = hqData.repairDepotLevel || 0;
-      const techLvl = hqData.techLabLevel || 0;
-
-      const baseRate = baseLvl === 1 ? 5 : baseLvl === 2 ? 15 : 40;
-      const solarRate = solarLvl === 1 ? 10 : solarLvl === 2 ? 25 : solarLvl === 3 ? 50 : 0;
-      const repairRate = repairLvl === 1 ? 25 : repairLvl === 2 ? 60 : repairLvl === 3 ? 120 : 0;
-      const techRate = techLvl === 1 ? 75 : techLvl === 2 ? 180 : techLvl === 3 ? 350 : 0;
-
-      const totalRate = baseRate + solarRate + repairRate + techRate;
-
-      const lastClaimed = new Date(hqData.lastClaimedAt || hqData.builtAt || new Date().toISOString());
-      const now = new Date();
-      const hoursElapsed = Math.max(0, (now.getTime() - lastClaimed.getTime()) / 3600000);
-      const accumulatedCoins = Math.floor(hoursElapsed * totalRate);
-
-      if (accumulatedCoins <= 0) {
-        triggerToast("No passive coins accumulated yet! Try again in a bit.", "info");
-        return;
-      }
-
-      await updateDoc(doc(db, 'users', uid), {
-        coins: increment(accumulatedCoins)
-      });
-      await updateDoc(hqRef, {
-        lastClaimedAt: now.toISOString()
-      });
-
-      triggerToast(`Collected +${accumulatedCoins} Coins from Headquarters!`, "success");
-    } catch (err) {
-      console.error("Collect income failed:", err);
-      triggerToast("Failed to collect income.", "info");
-    }
-  };
-
-  const handleUpgradeHQ = async (field: string, cost: number) => {
-    if (!auth.currentUser || !user) return;
-    const uid = auth.currentUser.uid;
-    if ((user.coins || 0) < cost) {
-      triggerToast(`Insufficient Coins! Upgrade costs ${cost} Coins.`, "info");
-      return;
-    }
-
-    try {
-      const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
-      const userRef = doc(db, 'users', uid);
-      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
-
-      let currentVal = 0;
-      const hqItem = empire.find(b => b.id === "hq_details");
-      if (hqItem) {
-        currentVal = hqItem[field] || 0;
-      } else {
-        const hqSnap = await getDoc(hqRef);
-        if (hqSnap.exists()) {
-          currentVal = hqSnap.data()[field] || 0;
-        }
-      }
-
-      const newVal = currentVal + 1;
-
-      await updateDoc(userRef, {
-        coins: increment(-cost),
-        empireValuation: increment(cost),
-        [field]: newVal
-      });
-
-      await updateDoc(hqRef, {
-        [field]: newVal,
-        valuation: increment(cost)
-      });
-
-      triggerToast(`Successfully purchased Level ${newVal} upgrade!`, "success");
-    } catch (err) {
-      console.error("HQ field upgrade failed:", err);
-      triggerToast("Failed to upgrade HQ component.", "info");
-    }
-  };
-
-  // Deprecated wrappers for backwards compatibility
-  const handleUpgradeScoutHouse = async (buildingId: string) => {
-    await handleUpgradeHQ("baseLevel", empire.find(b => b.id === buildingId)?.level === 1 ? 200 : 500);
-  };
-
-  const handleBuyBuilding = async (type: string, lat: number, lng: number) => {
-    let cost = 150;
-    let field = "solarGridLevel";
-    if (type === "solar_grid") { cost = 150; field = "solarGridLevel"; }
-    else if (type === "repair_depot") { cost = 300; field = "repairDepotLevel"; }
-    else if (type === "tech_lab") { cost = 800; field = "techLabLevel"; }
-
-    await handleUpgradeHQ(field, cost);
-  };
-
-  // Helper to show temporary toasts
-  const triggerToast = (message: string, type: "success" | "info" = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => {
-      setNotification(null);
-    }, 4500);
-  };
-
-  // Verify Case action
-  const handleVerifyCase = async (caseId: string, vote: "yes" | "no" | "undo" | "proof" = "yes") => {
-    if (!user) return;
-    
-    if (vote === "proof") {
-      setReturnView(view);
-      setIsResolveFlow(false);
-      setIsRejectionFlow(true);
-      setActiveResolveCaseId(caseId);
-      setActiveCameraOpen(true);
-      return;
-    }
-
-    try {
-      const { doc, getDoc, updateDoc, increment, arrayUnion, arrayRemove } = await import('firebase/firestore');
-      const caseRef = doc(db, 'cases', caseId);
-      const caseSnap = await getDoc(caseRef);
-      if (!caseSnap.exists()) return;
-      const caseData = caseSnap.data();
-
-      if (vote === "undo") {
-        await updateDoc(caseRef, {
-          verifications: increment(-1),
-          verifiedBy: arrayRemove(user.userId),
-          rejectedBy: arrayRemove(user.userId)
-        });
-        await updateDoc(doc(db, 'users', user.userId), {
-          xp: increment(-30),
-          coins: increment(-50),
-          totalVerifications: increment(-1)
-        });
-        triggerToast("Verification undone.", "success");
-      } else {
-        if (vote === "yes") {
-          const newVerifications = (caseData.verifications || 0) + 1;
-          await updateDoc(caseRef, {
-            verifications: increment(1),
-            verifiedBy: arrayUnion(user.userId),
-            status: newVerifications >= 2 && !caseData.complaintGenerated ? "confirmed" : caseData.status
-          });
-
-          // Auto-post verification activity
-          try {
-            const userSnap = await getDoc(doc(db, "users", user.userId));
-            const userData = userSnap.data();
-            if (userData?.communityId) {
-              await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-                senderId: user.userId,
-                senderName: userData.username || "Scout",
-                senderAvatar: userData.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.username || 'Scout'}`,
-                text: `🔍 I have verified the damage report near ${caseData.address || "the area"}!`,
-                type: "auto_post",
-                caseId: caseId,
-                createdAt: serverTimestamp()
-              });
-            }
-          } catch (err) {
-            console.error("Auto post verification chat error:", err);
-          }
-        } else if (vote === "no") {
-          await updateDoc(caseRef, {
-            rejectedBy: arrayUnion(user.userId)
-          });
-
-          // Auto-post dispute activity
-          try {
-            const userSnap = await getDoc(doc(db, "users", user.userId));
-            const userData = userSnap.data();
-            if (userData?.communityId) {
-              await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-                senderId: "system_ai",
-                senderName: "CS AI-agent",
-                senderAvatar: "https://api.dicebear.com/9.x/bottts/svg?seed=cs_ai",
-                text: `⚠️ Defect disputed: @${userData.username || "Scout"} voted 'No' on the ${(caseData.damageType || "").replace("_", " ")} at ${caseData.address || "the area"} (it may not exist or is already fixed).`,
-                type: "auto_post",
-                createdAt: serverTimestamp()
-              });
-            }
-          } catch (err) {
-            console.error("Auto post verification dispute error:", err);
-          }
-        }
-
-        const userRef = doc(db, 'users', user.userId);
-        const userSnap = await getDoc(userRef);
-        let currentLevel = 1;
-        let currentXp = 0;
-        if (userSnap.exists()) {
-          const uData = userSnap.data();
-          currentLevel = uData.level || 1;
-          currentXp = uData.xp || 0;
-        }
-
-        await updateDoc(userRef, {
-          xp: increment(30),
-          coins: increment(50),
-          totalVerifications: increment(1)
-        });
-
-        await checkLevelUp(user.userId, { level: currentLevel, xp: currentXp }, currentXp + 30, currentLevel);
-
-        if (vote === "no") {
-          triggerToast("Negative verification recorded.", "success");
-        } else {
-          triggerToast("Scouting Consensus recorded! XP and trust score boosted.", "success");
-        }
-
-        const freshCaseSnap = await getDoc(caseRef);
-        const updatedCase = freshCaseSnap.data();
-        if (updatedCase && updatedCase.verifications >= 2 && !updatedCase.complaintGenerated) {
-          triggerToast("2+ citizen consensus reached! Dispatching government letter.", "info");
-          handleTriggerDispatcher(caseId);
-
-          // Auto-post case confirmation
-          try {
-            const userSnap = await getDoc(doc(db, "users", user.userId));
-            const userData = userSnap.data();
-            if (userData?.communityId) {
-              await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-                senderId: "system_ai",
-                senderName: "CS AI-agent",
-                senderAvatar: "https://api.dicebear.com/9.x/bottts/svg?seed=cs_ai",
-                text: `✅ Consensus reached: The ${(updatedCase.damageType || "").replace("_", " ")} reported at ${updatedCase.address || "the area"} has been verified by the community and is now CONFIRMED! 🏛️ Dispatch letter sent to municipality.`,
-                type: "auto_post",
-                createdAt: serverTimestamp()
-              });
-            }
-          } catch (msgErr) {
-            console.error("Failed to post confirmation message:", msgErr);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Verify request failed:", err);
-      triggerToast("Verification failed.", "info");
-    }
-  };
-
-  // Trigger Scanner Camera Capture
-  const handleTriggerScan = () => {
-    setReturnView(view);
-    setIsResolveFlow(false);
-    setIsRejectionFlow(false);
-    setActiveResolveCaseId(null);
-    setActiveCameraOpen(true);
-  };
-
-  // Trigger Resolver Camera Capture (Proof repair)
-  const handleResolveCase = (caseId: string) => {
-    setReturnView(view);
-    setIsResolveFlow(true);
-    setIsRejectionFlow(false);
-    setActiveResolveCaseId(caseId);
-    setActiveCameraOpen(true);
-  };
-
-  // Receive Captured Base64 Photo
-  const handleCaptureComplete = async (base64: string, capturedLat?: number, capturedLng?: number) => {
-    setCapturedImageBase64(base64);
-    setActiveCameraOpen(false);
-
-    const finalLat = capturedLat !== undefined ? capturedLat : playerPos.lat;
-    const finalLng = capturedLng !== undefined ? capturedLng : playerPos.lng;
-
-    if (isRejectionFlow && activeResolveCaseId) {
-      try {
-        const res = await fetch(`${API_BASE}/api/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            caseId: activeResolveCaseId,
-            userId: user?.userId,
-            vote: "proof",
-            imageBase64: base64,
-            latitude: finalLat,
-            longitude: finalLng
-          })
-        });
-        if (!res.ok) {
-          let errorMsg = `Verification request failed with status ${res.status}`;
-          try {
-            const errText = await res.text();
-            if (errText.includes("<!doctype") || errText.includes("<html")) {
-              errorMsg = "Server returned HTML error page. The backend server might be offline.";
-            } else {
-              errorMsg = errText.slice(0, 100);
-            }
-          } catch (_) {}
-          throw new Error(errorMsg);
-        }
-        const result = await res.json();
-        if (result.success) {
-          triggerToast("Proof of invalid report added.", "success");
-        } else {
-          triggerToast(result.error || "Failed to add proof.", "info");
-        }
-      } catch (e: any) {
-        console.error(e);
-        triggerToast(e.message || "Failed to submit verification.", "info");
-      }
-      setView(returnView || "game");
-      setReturnView(null);
-      setScannerResult(null);
-      setScanResultLoading(false);
-      setCapturedImageBase64("");
-      return;
-    }
-
-    setView("scanner_result");
-    setScanResultLoading(true);
-    setScannerResult(null);
-
-    try {
-      // Compress the image before uploading to keep payload small and avoid server processing bottlenecks
-      const compressedBase64 = await compressImageHelper(base64);
-      setCapturedImageBase64(compressedBase64);
-
-      let data: any;
-      if (isResolveFlow && activeResolveCaseId) {
-        // Run Resolver Agent comparing previous damage image with this new photo
-        const res = await fetch(`${API_BASE}/api/agents/resolver`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            caseId: activeResolveCaseId,
-            afterImageBase64: compressedBase64,
-            userId: user?.userId,
-            selectedModel: agentModels.resolver,
-            latitude: finalLat,
-            longitude: finalLng
-          })
-        });
-
-        if (!res.ok) {
-          let errorMsg = `Resolver request failed with status ${res.status}`;
-          try {
-            const errData = await res.json();
-            errorMsg = errData.error || errorMsg;
-          } catch (_) {
-            try {
-              const text = await res.text();
-              if (text.includes("<!doctype") || text.includes("<html")) {
-                errorMsg = "Server returned an HTML error page. The backend server might be restarting or offline.";
-              } else {
-                errorMsg = text.slice(0, 100) || errorMsg;
-              }
-            } catch (_) {}
-          }
-          throw new Error(errorMsg);
-        }
-
-        data = await res.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        setScannerResult(data.analysis || data);
-      } else {
-        // Run Scanner Agent analyzing new defect photo
-        const res = await fetch(`${API_BASE}/api/agents/scanner`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageBase64: compressedBase64,
-            latitude: finalLat,
-            longitude: finalLng,
-            userId: user?.userId,
-            selectedModel: agentModels.scanner
-          })
-        });
-
-        if (!res.ok) {
-          let errorMsg = `Scanner request failed with status ${res.status}`;
-          try {
-            const errData = await res.json();
-            errorMsg = errData.error || errorMsg;
-          } catch (_) {
-            try {
-              const text = await res.text();
-              if (text.includes("<!doctype") || text.includes("<html")) {
-                errorMsg = "Server returned an HTML error page. The backend server might be restarting or offline.";
-              } else {
-                errorMsg = text.slice(0, 100) || errorMsg;
-              }
-            } catch (_) {}
-          }
-          throw new Error(errorMsg);
-        }
-
-        data = await res.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        setScannerResult(data);
-      }
-      setScanResultLoading(false);
-    } catch (err: any) {
-      console.error("AI agent processing error:", err);
-      setScanResultLoading(false);
-      triggerToast("Gemini Agent timeout or failure. Please try again.", "info");
-      setView("game");
-    }
-  };
-
-  // Confirm and log report to database
-  const handleConfirmScanResult = async (editedData?: {
-    damageType: string;
-    severity: number;
-    description: string;
-  }) => {
-    if (!scannerResult || !auth.currentUser) return;
-
-    const uid = auth.currentUser.uid;
-
-    if (isResolveFlow) {
-      // In repair flow: generate Scratch card reward!
-      try {
-        const { generateScratchCard } = await import('./lib/rewards');
-        const rwd = generateScratchCard();
-
-        const rewardObj = {
-          id: "rwd_" + Date.now(),
-          tier: rwd.tier,
-          xpEarned: rwd.xpEarned,
-          trustBoost: rwd.trustBoost,
-          coinsEarned: rwd.coinsEarned,
-          scratched: false,
-          couponRedeemed: false,
-          message: rwd.message,
-          createdAt: new Date().toISOString()
-        };
-
-        const { doc, setDoc, updateDoc, increment } = await import('firebase/firestore');
-        await setDoc(doc(db, 'users', uid, 'rewards', rewardObj.id), rewardObj);
-
-        // Update resolver's totalResolved count
-        await updateDoc(doc(db, 'users', uid), {
-          totalResolved: increment(1)
-        });
-
-        // Also update the case
-        if (activeResolveCaseId) {
-          const { updateDoc, getDoc, doc, increment } = await import('firebase/firestore');
-          const caseRef = doc(db, 'cases', activeResolveCaseId);
-          await updateDoc(caseRef, {
-            status: "resolved",
-            resolvedBy: uid,
-            updatedAt: new Date().toISOString()
-          });
-
-          // Auto-post repair resolved
-          try {
-            const caseSnap = await getDoc(caseRef);
-            const caseData = caseSnap.data();
-            const userSnap = await getDoc(doc(db, "users", uid));
-            const userData = userSnap.data();
-            if (userData?.communityId && caseData) {
-              await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-                senderId: uid,
-                senderName: userData.username || "Scout",
-                senderAvatar: userData.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.username || 'Scout'}`,
-                text: `🔧 I have provided proof of repair for the damage near ${caseData.address || "the area"}!`,
-                type: "auto_post",
-                caseId: activeResolveCaseId,
-                createdAt: serverTimestamp()
-              });
-
-              // Update community stats in Firestore for resolved cases
-              const communityRef = doc(db, 'communities', userData.communityId);
-              const communitySnap = await getDoc(communityRef);
-              if (communitySnap.exists()) {
-                const hData = communitySnap.data();
-                const currentTotal = hData.totalCases || 0;
-                const currentResolved = (hData.resolvedCases || 0) + 1;
-                const newHealth = currentTotal > 0 ? Math.min(100, Math.floor((currentResolved / currentTotal) * 100)) : 100;
-                await updateDoc(communityRef, {
-                  resolvedCases: increment(1),
-                  healthScore: newHealth
-                });
-              }
-            }
-          } catch (msgErr) {
-            console.error("Failed to post resolution message or update community stats:", msgErr);
-          }
-        }
-        
-        setScratchReward(rewardObj);
-        triggerToast("Repair confirmed by AI! Scratch reward card unlocked.", "success");
-      } catch (err) {
-        console.error("Error creating reward:", err);
-        setView(returnView || "game");
-        setReturnView(null);
-      }
-    } else if (scannerResult.success === false && scannerResult.reason === "duplicate") {
-      // Duplicate path: upvote recorded, just reward small consensus XP
-      triggerToast("Scout upvote recorded on nearby duplicates! +15 XP", "success");
-      setView(returnView || "game");
-      setReturnView(null);
-    } else {
-      // New scan success path: first update case details in DB if edited
-      const cItem = scannerResult.case || scannerResult;
-      
-      const newCase = {
-        ...cItem,
-        ...(editedData || {}),
-        reportedBy: uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      try {
-        const { setDoc, getDoc, doc } = await import('firebase/firestore');
-        
-        let finalImageUrl = newCase.imageUrl;
-        if (capturedImageBase64) {
-          finalImageUrl = capturedImageBase64.startsWith('data:image') 
-            ? capturedImageBase64 
-            : `data:image/jpeg;base64,${capturedImageBase64}`;
-        }
-        newCase.imageUrl = finalImageUrl;
-
-        // Fetch user data to retrieve communityId
-        const userSnap = await getDoc(doc(db, "users", uid));
-        const userData = userSnap.data();
-        if (userData?.communityId) {
-          newCase.communityId = userData.communityId;
-        } else {
-          newCase.communityId = 'default_hood';
-        }
-
-        // Save case to Firestore
-        await setDoc(doc(db, 'cases', newCase.id), newCase);
-
-        // Auto-post new defect report and update community statistics
-        if (userData?.communityId) {
-          try {
-            await addDoc(collection(db, `communities/${userData.communityId}/messages`), {
-              senderId: uid,
-              senderName: userData.username || "Scout",
-              senderAvatar: userData.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.username || 'Scout'}`,
-              text: `🚨 I have uploaded a new damage report near ${newCase.address || "the area"}!`,
-              type: "auto_post",
-              caseId: newCase.id,
-              createdAt: serverTimestamp()
-            });
-
-            // Update community stats in Firestore
-            const { updateDoc, increment } = await import('firebase/firestore');
-            const communityRef = doc(db, 'communities', userData.communityId);
-            const communitySnap = await getDoc(communityRef);
-            if (communitySnap.exists()) {
-              const hData = communitySnap.data();
-              const currentTotal = (hData.totalCases || 0) + 1;
-              const currentResolved = hData.resolvedCases || 0;
-              const newHealth = currentTotal > 0 ? Math.min(100, Math.floor((currentResolved / currentTotal) * 100)) : 100;
-              await updateDoc(communityRef, {
-                totalCases: increment(1),
-                healthScore: newHealth
-              });
-            }
-          } catch (msgErr) {
-            console.error("Failed to post scan chat message or update community stats:", msgErr);
-          }
-        }
-
-        // User stats update
-        if (user) {
-          const { updateDoc, increment } = await import('firebase/firestore');
-          await updateDoc(doc(db, 'users', uid), {
-            totalReports: increment(1)
-          });
-        }
-
-        const { generateScratchCard } = await import('./lib/rewards');
-        const rwd = generateScratchCard();
-
-        const rewardObj = {
-          id: "rwd_" + Date.now(),
-          tier: rwd.tier,
-          xpEarned: rwd.xpEarned,
-          trustBoost: rwd.trustBoost,
-          coinsEarned: rwd.coinsEarned,
-          scratched: false,
-          couponRedeemed: false,
-          message: rwd.message,
-          createdAt: new Date().toISOString()
-        };
-
-        await setDoc(doc(db, 'users', uid, 'rewards', rewardObj.id), rewardObj);
-        setScratchReward(rewardObj);
-        triggerToast("Issue logged on neighborhood grid! Scratch card unlocked.", "success");
-      } catch (err) {
-        console.error("Error creating case/reward:", err);
-        setView(returnView || "game");
-        setReturnView(null);
-      }
-    }
-  };
-
-  // Scratch card revealed & claimed
-  const handleClaimScratchReward = async () => {
-    if (scratchReward && auth.currentUser) {
-      try {
-        const uid = auth.currentUser.uid;
-        const { doc, updateDoc, increment, getDoc } = await import('firebase/firestore');
-        
-        // 1. Mark Scratch Card as scratched in Firestore subcollection
-        await updateDoc(doc(db, 'users', uid, 'rewards', scratchReward.id), {
-          scratched: true
-        });
-
-        // 2. Fetch current user document to know current level & XP before updating
-        const userRef = doc(db, 'users', uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          const oldXp = userData.xp || 0;
-          const currentLevel = userData.level || 1;
-          
-          const xpToAdd = scratchReward.xpEarned || 0;
-          const trustToAdd = scratchReward.trustBoost || 0;
-          const coinsToAdd = scratchReward.coinsEarned || 0;
-
-          const newXp = oldXp + xpToAdd;
-          const currentTrust = userData.trustScore || 50;
-          const newTrust = Math.min(100, Math.max(0, currentTrust + trustToAdd));
-
-          // 3. Update stats
-          await updateDoc(userRef, {
-            xp: increment(xpToAdd),
-            trustScore: newTrust,
-            coins: increment(coinsToAdd)
-          });
-
-          // 4. Check for level up!
-          await checkLevelUp(uid, userData, newXp, currentLevel);
-        }
-      } catch (err) {
-        console.error("Failed to update user profile with scratch card rewards:", err);
-      }
-    }
-    setScratchReward(null);
-    setScannerResult(null);
-    setCapturedImageBase64("");
-    setView(returnView || "game");
-    setReturnView(null);
-    setShowReconstructionOffer(true);
-  };
-
-  const handleAcceptFreeHqUpgrade = async () => {
-    if (!auth.currentUser || !user) return;
-    const uid = auth.currentUser.uid;
-    try {
-      const { doc, getDoc, updateDoc, increment } = await import('firebase/firestore');
-      const hqRef = doc(db, `users/${uid}/empire`, "hq_details");
-      const hqSnap = await getDoc(hqRef);
-      if (!hqSnap.exists()) {
-        triggerToast("Please establish your HQ base first!", "info");
-        setShowReconstructionOffer(false);
-        return;
-      }
-      const hqData = hqSnap.data();
-      const currentLvl = hqData.baseLevel || 1;
-
-      if (currentLvl >= 3) {
-        await updateDoc(doc(db, 'users', uid), {
-          coins: increment(150)
-        });
-        triggerToast("HQ already at maximum level! Awarded +150 Coins instead.", "success");
-      } else {
-        await updateDoc(doc(db, 'users', uid), {
-          baseLevel: currentLvl + 1,
-          empireValuation: increment(150)
-        });
-        await updateDoc(hqRef, {
-          baseLevel: currentLvl + 1,
-          valuation: increment(150)
-        });
-        triggerToast(`HQ Base upgraded to Level ${currentLvl + 1} for free!`, "success");
-      }
-    } catch (err) {
-      console.error("Free upgrade failed:", err);
-      triggerToast("Failed to process free upgrade.", "info");
-    }
-    setShowReconstructionOffer(false);
-  };
-
-  const handleClaimBonusCoins = async () => {
-    if (!auth.currentUser || !user) return;
-    const uid = auth.currentUser.uid;
-    try {
-      const { doc, updateDoc, increment } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'users', uid), {
-        coins: increment(150)
-      });
-      triggerToast("Claimed +150 Coins bonus!", "success");
-    } catch (err) {
-      console.error("Failed to claim bonus coins:", err);
-      triggerToast("Failed to claim bonus coins.", "info");
-    }
-    setShowReconstructionOffer(false);
-  };
-
-  // Reset progress data hook (Dev luxury)
-  const handleResetApp = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/user/reset`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        triggerToast("Full municipal database reset successfully! State reloaded.", "success");
-        setView("landing");
-      }
-    } catch (err) {
-      console.error("Reset app error:", err);
-    }
-  };
-
-  // Run Dispatcher Agent on specific case (creates formal government complaint letters)
-  const handleTriggerDispatcher = async (caseId: string) => {
-    const caseObj = cases.find(c => c.id === caseId);
-    if (!caseObj) return;
-
-    setActiveDispatchCase(caseObj);
-    setDispatchLoading(true);
-    setDispatchLetter(null);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/agents/dispatcher`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId, selectedModel: agentModels.dispatcher })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDispatchLetter(data.dispatchData);
-        
-        // Persist dispatch letter into Firestore cases collection
-        try {
-          const { doc, updateDoc } = await import('firebase/firestore');
-          const caseRef = doc(db, 'cases', caseId);
-          await updateDoc(caseRef, {
-            status: "dispatched",
-            complaintGenerated: true,
-            complaintLetter: data.dispatchData.complaintLetter,
-            subject: data.dispatchData.subject,
-            escalationPath: data.dispatchData.escalationPath,
-            rtiQuery: data.dispatchData.rtiQuery
-          });
-        } catch (dbErr) {
-          console.error("Failed to save dispatch letter to firestore:", dbErr);
-        }
-
-        triggerToast("Formal municipal directive compiled and dispatched!", "success");
-      } else {
-        triggerToast("Failed to compile government directive.", "info");
-        setActiveDispatchCase(null);
-      }
-      setDispatchLoading(false);
-    } catch (err) {
-      console.error("Dispatcher API failed:", err);
-      setDispatchLoading(false);
-      setActiveDispatchCase(null);
-    }
-  };
-
-  // Render loading screen on app initialize
-  const isAuthView = view === "login" || view === "signup";
-  const isUnauthLanding = view === "landing" && !authUser;
-  if (initialLoading || (!isAuthView && !isUnauthLanding && (!user || !hood))) {
-    return (
-      <div className="bg-[#F5F0E8] min-h-[100dvh] font-sans flex flex-col justify-center items-center text-[#191c22]">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-[#006a65] border-t-transparent rounded-full animate-spin mx-auto" />
-          <h2 className="font-display text-xl font-black uppercase tracking-widest text-[#775a00]">
-            CIVIC SUCCEDENT GRID
-          </h2>
-          <p className="text-xs text-zinc-500 font-bold">Synchronizing municipal telemetry logs...</p>
-        </div>
+import ProfilePage from "./pages/ProfilePage";
+import ScanResultPage from "./pages/ScanResultPage";
+import IssueDetailPage from "./pages/IssueDetailPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import ReportIssuePage from "./pages/ReportIssuePage";
+import { Compass, Map, Users, User, Shield } from "lucide-react";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { authUser, initialLoading } = useAuth();
+  if (initialLoading) return <LoadingScreen />;
+  if (!authUser) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function LoadingScreen() {
+  const { t } = useLanguage();
+  return (
+    <div className="bg-[#F5F0E8] min-h-[100dvh] font-sans flex flex-col justify-center items-center text-[#191c22]">
+      <div className="text-center space-y-4">
+        <div className="w-12 h-12 border-4 border-[#006a65] border-t-transparent rounded-full animate-spin mx-auto" />
+        <h2 className="font-display text-xl font-black uppercase tracking-widest text-[#006a65]">{t.app.name}</h2>
+        <p className="text-xs text-zinc-500 font-bold">{t.common.loading}</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+function ShellLayout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const hideNav = ["/login", "/signup", "/"].includes(location.pathname) || location.pathname === "/scan-result";
 
   return (
     <div className="bg-[#F5F0E8] min-h-[100dvh] text-[#191c22] font-sans overflow-x-hidden">
-      
-      {/* Toast Notification Box */}
+      {children}
+      {!hideNav && (
+        <nav className="fixed bottom-0 left-0 w-full z-40 bg-white/95 border-t border-[#d2c5ae]/30 shadow-lg backdrop-blur-md px-2 py-3 flex justify-around items-center gap-1">
+          <NavLink to="/patrol" icon={Compass} label={t.nav.patrol} />
+          <NavLink to="/maps" icon={Map} label={t.nav.maps} />
+          <NavLink to="/community" icon={Users} label={t.nav.lounge} />
+          <NavLink to="/profile" icon={User} label={t.nav.profile} />
+          {user?.isAdmin && <NavLink to="/admin" icon={Shield} label="Admin" />}
+        </nav>
+      )}
+      <Overlays />
+    </div>
+  );
+}
+
+function NavLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  return (
+    <Link to={to} className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${isActive ? "text-[#006a65]" : "text-zinc-400 hover:text-zinc-600"}`}>
+      <Icon className="w-5 h-5 flex-shrink-0" style={isActive ? { fill: "rgba(0,106,101,0.15)" } : {}} />
+      <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">{label}</span>
+    </Link>
+  );
+}
+
+function Overlays() {
+  const { notification, activeDispatchCase, setActiveDispatchCase, dispatchLoading, dispatchLetter } = useAuth();
+  const { t } = useLanguage();
+
+  return (
+    <>
       {notification && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] max-w-sm w-full px-4 animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className={`p-4 rounded-2xl shadow-xl flex items-start gap-3 border ${
-            notification.type === "success" 
-              ? "bg-[#e1fbf2] text-[#006f47] border-[#00af6c]/20" 
-              : "bg-[#eef3fc] text-[#1b51b7] border-[#2f6ce5]/20"
-          }`}>
-            <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5 animate-pulse" />
+          <div className={`p-4 rounded-2xl shadow-xl flex items-start gap-3 border ${notification.type === "success" ? "bg-[#e1fbf2] text-[#006f47] border-[#00af6c]/20" : "bg-[#eef3fc] text-[#1b51b7] border-[#2f6ce5]/20"}`}>
             <div className="text-xs font-bold leading-relaxed">{notification.message}</div>
           </div>
         </div>
       )}
 
-      <div style={{ display: view === "login" ? "block" : "none" }}>
-        <LoginView onSwitchToSignup={() => { window.location.replace("#signup"); }} onGoHome={() => { window.location.hash = ""; }} />
-      </div>
-
-      <div style={{ display: view === "signup" ? "block" : "none" }}>
-        <SignupView onSwitchToLogin={() => { window.location.replace("#login"); }} onGoHome={() => { window.location.hash = ""; }} />
-      </div>
-
-
-      {/* Main Content Area */}
-      <div style={{ display: view === "landing" ? "block" : "none" }}>
-        <LandingView
-          user={user}
-          isAuthenticated={!!authUser}
-          onLogin={() => { window.location.hash = "login"; }}
-          onSignup={() => { window.location.hash = "signup"; }}
-          onStartMission={() => { window.location.hash = "patrol"; }}
-          onViewProfile={() => { window.location.hash = "profile"; }}
-          onViewLeaderboard={() => {
-            setInitialLeaderboardOpen(true);
-            window.location.hash = "community";
-          }}
-          onViewMaps={() => { window.location.hash = "maps"; }}
-        />
-      </div>
-
-      {user && hood && (
-        <div style={{ display: view === "game" ? "block" : "none" }}>
-          <GameView
-            key={`game-${user.userId}`}
-            cases={cases}
-            user={user}
-            hood={hood}
-            playerPos={playerPos}
-            setPlayerPos={setPlayerPos}
-            onVerifyCase={handleVerifyCase}
-            onResolveCase={handleResolveCase}
-            onTriggerScan={handleTriggerScan}
-            empireBuildings={empire}
-            onCollectIncome={handleCollectIncome}
-            onUpgradeScoutHouse={handleUpgradeScoutHouse}
-            onBuyBuilding={handleBuyBuilding}
-            onUpgradeHQ={handleUpgradeHQ}
-            publicBases={publicBases}
-            selectedCaseIdFromChat={selectedCaseIdFromChat}
-            setSelectedCaseIdFromChat={setSelectedCaseIdFromChat}
-            onPinHQ={handleEstablishHQ}
-          />
-        </div>
-      )}
-
-      {user && (
-        <div style={{ display: view === "profile" ? "block" : "none" }}>
-          <ProfileView
-            key={`profile-${user.userId}`}
-            user={user}
-            cases={cases}
-            onReset={handleResetApp}
-            onScratchSavedCard={(reward) => {
-              setScratchReward(reward);
-              setReturnView("profile");
-            }}
-          />
-        </div>
-      )}
-
-      {user && hood && (
-        <div style={{ display: view === "community" ? "block" : "none" }}>
-          <CommunityView
-            key={`community-${user.userId}-${hood.id}`}
-            hood={hood}
-            leaderboard={leaderboard}
-            liveActivities={liveActivities}
-            user={user}
-            moderatorModel={agentModels.moderator}
-            initialLeaderboardOpen={initialLeaderboardOpen}
-            onViewCaseOnMap={(caseId, lat, lng) => {
-              setPlayerPos({ lat, lng });
-              setSelectedCaseIdFromChat(caseId);
-              window.location.hash = "patrol";
-            }}
-          />
-        </div>
-      )}
-
-      {user?.isAdmin && (
-        <div style={{ display: view === "admin" ? "block" : "none" }}>
-          <AdminView
-            key={`admin-${user.userId}`}
-            user={user}
-            agentModels={agentModels}
-            onAgentModelChange={(agent, model) => {
-              const updated = { ...agentModels, [agent]: model };
-              setAgentModels(updated);
-              localStorage.setItem("civic_succedent_agent_models_v2", JSON.stringify(updated));
-              triggerToast(`Model for ${agent.toUpperCase()} Agent set to ${model}!`, "success");
-            }}
-          />
-        </div>
-      )}
-
-      {user && (
-        <div style={{ display: view === "route_planner" ? "block" : "none" }}>
-          <RoutePlannerView
-            key={`route-${user.userId}`}
-            cases={cases}
-            playerPos={playerPos}
-            setPlayerPos={setPlayerPos}
-            onTriggerScan={handleTriggerScan}
-          />
-        </div>
-      )}
-
-      {view === "scanner_result" && (
-        <ScanResultView
-          loading={scanResultLoading}
-          capturedImage={capturedImageBase64}
-          isResolveFlow={isResolveFlow}
-          beforeImage={cases.find(c => c.id === activeResolveCaseId)?.imageUrl}
-          analysisResult={scannerResult}
-          onConfirm={handleConfirmScanResult}
-          selectedModel={isResolveFlow ? agentModels.resolver : agentModels.scanner}
-          onCancel={async () => {
-            const cItem = scannerResult?.case || scannerResult;
-            const caseId = cItem?.id;
-            if (caseId && !isResolveFlow && scannerResult?.success !== false) {
-              try {
-                await fetch(`${API_BASE}/api/cases/${caseId}`, { method: "DELETE" });
-              } catch (e) {
-                console.error("Failed to discard case:", e);
-              }
-            }
-            setView(returnView || "game");
-            setReturnView(null);
-            setCapturedImageBase64("");
-            setScannerResult(null);
-          }}
-        />
-      )}
-
-      {/* CAMERA OVERLAY STREAM */}
-      {activeCameraOpen && (
-        <CameraCapture
-          onCapture={handleCaptureComplete}
-          onClose={() => {
-            setActiveCameraOpen(false);
-            setIsResolveFlow(false);
-            if (returnView) setView(returnView);
-            setReturnView(null);
-          }}
-        />
-      )}
-
-      {/* SCRATCH CARD REWARD POPUP OVERLAY */}
-      {scratchReward && (
-        <ScratchCard
-          reward={scratchReward}
-          onClaim={handleClaimScratchReward}
-        />
-      )}
-
-      {/* LEVEL UP POPUP OVERLAY */}
-      {levelUpData && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-6 font-sans animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center border border-yellow-400/30 text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Ambient Sparkle and Accent Glow */}
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-yellow-400/10 rounded-full blur-2xl animate-pulse" />
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-teal-500/10 rounded-full blur-2xl animate-pulse" />
-
-            <div className="w-20 h-20 bg-gradient-to-tr from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-white shadow-lg mb-4 animate-bounce">
-              <Trophy className="w-10 h-10" />
-            </div>
-
-            <span className="text-[10px] bg-yellow-100 text-yellow-850 border border-yellow-200 px-3.5 py-1 rounded-full font-black uppercase tracking-wider">
-              LEVEL UP UNLOCKED!
-            </span>
-
-            <h3 className="font-display text-3xl font-black text-zinc-900 mt-3 uppercase tracking-tight">
-              Level {levelUpData.level}
-            </h3>
-            <p className="text-[#006a65] font-black text-sm uppercase tracking-wide">
-              {levelUpData.rank}
-            </p>
-
-            <div className="w-full bg-zinc-50 border border-zinc-150 rounded-2xl p-4 my-5 space-y-3">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block border-b pb-1">
-                Progression Upgrade Rewards
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white border border-zinc-200/60 p-2.5 rounded-xl text-center">
-                  <span className="block text-lg font-black text-amber-500 leading-none">+{levelUpData.coinsBonus}</span>
-                  <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider">Coins</span>
-                </div>
-                <div className="bg-white border border-zinc-200/60 p-2.5 rounded-xl text-center">
-                  <span className="block text-lg font-black text-teal-600 leading-none">+{levelUpData.trustBonus}%</span>
-                  <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider">Trust Score</span>
-                </div>
-              </div>
-
-              <div className="bg-indigo-50/60 border border-indigo-100 p-3 rounded-xl text-center space-y-1">
-                <span className="text-[9px] text-indigo-500 font-black uppercase tracking-wider block">Commercial Coupon Unlocked</span>
-                <span className="font-bold text-xs text-zinc-800 block">{levelUpData.couponName}</span>
-                <span className="font-mono text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md inline-block uppercase select-all border border-indigo-200/50">
-                  {levelUpData.couponCode}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setLevelUpData(null)}
-              className="w-full bg-yellow-400 text-black py-3.5 rounded-xl font-bold text-sm shadow-md hover:bg-yellow-350 active:scale-95 transition-all cursor-pointer flex justify-center items-center gap-1.5"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Continue Protecting the City</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MUNICIPAL DISPATCHER DIRECTIVE DETAILS MODAL */}
       {activeDispatchCase && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-zinc-150 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b pb-2">
               <div>
-                <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
-                  MUNICIPAL COMPLAINT SYSTEM
-                </span>
-                <h3 className="font-display text-lg font-black uppercase mt-1">Complaint Directive</h3>
+                <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">{t.dispatch.aiSystem}</span>
+                <h3 className="font-display text-lg font-black uppercase mt-1">{t.dispatch.draft}</h3>
               </div>
-              <button
-                onClick={() => setActiveDispatchCase(null)}
-                className="text-zinc-400 hover:text-zinc-600 font-bold"
-              >
-                [Close]
-              </button>
+              <button onClick={() => setActiveDispatchCase(null)} className="text-zinc-400 hover:text-zinc-600 font-bold">{t.dispatch.close}</button>
             </div>
-
             {dispatchLoading ? (
               <div className="py-12 text-center space-y-3">
                 <div className="w-10 h-10 border-4 border-[#006a65] border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-xs text-zinc-500 font-bold">Compiling formal complaint directive via Gemini...</p>
+                <p className="text-xs text-zinc-500 font-bold">{t.dispatch.generating}</p>
               </div>
             ) : dispatchLetter ? (
               <div className="space-y-4">
                 <div className="bg-[#fff9eb] border border-[#f0c040]/30 p-3.5 rounded-2xl">
-                  <span className="text-[9px] uppercase font-bold text-zinc-400 block tracking-wider">SUBJECT DIRECTIVE</span>
+                  <span className="text-[9px] uppercase font-bold text-zinc-400 block tracking-wider">{t.dispatch.subject}</span>
                   <p className="text-xs font-black text-[#775a00] mt-0.5">{dispatchLetter.subject}</p>
                 </div>
-
-                <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-150 text-xs font-mono max-h-48 overflow-y-auto whitespace-pre-line text-zinc-700 leading-relaxed shadow-inner">
-                  {dispatchLetter.complaintLetter}
-                </div>
-
-                <div className="bg-[#f2f4fa] border border-indigo-100 p-3.5 rounded-2xl text-[11px] text-zinc-650 leading-relaxed space-y-1.5">
-                  <p><strong>Escalation Plan (30 days):</strong> {dispatchLetter.escalationPath}</p>
-                  <p><strong>Proposed RTI Query:</strong> {dispatchLetter.rtiQuery}</p>
-                </div>
-
-                <button
-                  onClick={() => setActiveDispatchCase(null)}
-                  className="w-full bg-[#006a65] text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-teal-700 transition-colors"
-                >
-                  Confirm and Log Dispatch
-                </button>
+                <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-150 text-xs font-mono max-h-48 overflow-y-auto whitespace-pre-line text-zinc-700 leading-relaxed">{dispatchLetter.complaintLetter}</div>
+                <button onClick={() => setActiveDispatchCase(null)} className="w-full bg-[#006a65] text-white py-3 rounded-xl font-bold text-xs uppercase">{t.dispatch.confirm}</button>
               </div>
-            ) : (
-              <p className="text-xs text-rose-500">Failed to compile directive. Please close and retry.</p>
-            )}
+            ) : <p className="text-xs text-rose-500">{t.dispatch.failed}</p>}
           </div>
         </div>
       )}
-
-      {/* Dynamic Bottom Tab Bar Navigation */}
-      {view !== "landing" && view !== "login" && view !== "signup" && view !== "scanner_result" && !activeCameraOpen && (
-        <nav className="fixed bottom-0 left-0 w-full z-40 bg-white/95 border-t border-[#d2c5ae]/30 shadow-lg backdrop-blur-md px-2 py-3 flex justify-around items-center gap-1">
-          
-          {/* Tab 1: Map/Patrol Grid */}
-          <button
-            onClick={() => {
-              setInitialLeaderboardOpen(false);
-              window.location.hash = "patrol";
-            }}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
-              view === "game" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
-            }`}
-          >
-            <Compass className="w-5 h-5 flex-shrink-0" style={view === "game" ? { fill: "rgba(119,90,0,0.15)" } : {}} />
-            <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Patrol</span>
-          </button>
-
-          {/* Tab 1.5: Safe Maps Route Planner */}
-          <button
-            onClick={() => {
-              setInitialLeaderboardOpen(false);
-              window.location.hash = "maps";
-            }}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
-              view === "route_planner" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
-            }`}
-          >
-            <Map className="w-5 h-5 flex-shrink-0" style={view === "route_planner" ? { fill: "rgba(119,90,0,0.15)" } : {}} />
-            <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Maps</span>
-          </button>
-
-          {/* Tab 2: Community Portal */}
-          <button
-            onClick={() => {
-              setInitialLeaderboardOpen(false);
-              window.location.hash = "community";
-            }}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
-              view === "community" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
-            }`}
-          >
-            <Users className="w-5 h-5 flex-shrink-0" style={view === "community" ? { fill: "rgba(119,90,0,0.15)" } : {}} />
-            <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Community</span>
-          </button>
-
-          {/* Tab 3: Scout Profile */}
-          <button
-            onClick={() => {
-              setInitialLeaderboardOpen(false);
-              window.location.hash = "profile";
-            }}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
-              view === "profile" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
-            }`}
-          >
-            <User className="w-5 h-5 flex-shrink-0" style={view === "profile" ? { fill: "rgba(119,90,0,0.15)" } : {}} />
-            <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Profile</span>
-          </button>
-
-          {user?.isAdmin && (
-            <button
-              onClick={() => {
-                setInitialLeaderboardOpen(false);
-                window.location.hash = "admin";
-              }}
-              className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors flex-1 min-w-0 text-center ${
-                view === "admin" ? "text-[#775a00]" : "text-zinc-400 hover:text-zinc-600"
-              }`}
-            >
-              <Shield className="w-5 h-5 flex-shrink-0" style={view === "admin" ? { fill: "rgba(119,90,0,0.15)" } : {}} />
-              <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Admin</span>
-            </button>
-          )}
-
-          {/* Tab 4: Back to landing */}
-          <button
-            onClick={() => {
-              setInitialLeaderboardOpen(false);
-              window.location.hash = "";
-            }}
-            className="flex flex-col items-center gap-0.5 text-red-700 hover:text-red-850 cursor-pointer flex-1 min-w-0 text-center transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 flex-shrink-0" />
-            <span className="text-[8px] font-black uppercase tracking-tight font-sans truncate w-full">Exit</span>
-          </button>
-        </nav>
-      )}
-      {/* RECONSTRUCTION OFFER POPUP OVERLAY */}
-      {showReconstructionOffer && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[110] flex items-center justify-center p-6 font-sans">
-          <div className="rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-cyan-400/20"
-               style={{
-                 backdropFilter: "blur(16px)",
-                 background: "rgba(16,16,24,0.85)",
-                 color: "#white"
-               }}>
-            <div className="w-16 h-16 bg-[#7f00ff]/20 rounded-full flex items-center justify-center text-[#00f2fe] border border-[#00f2fe]/40 mb-4 animate-pulse">
-              <Sparkles className="w-8 h-8" />
-            </div>
-
-            <span className="text-[10px] bg-cyan-500/10 text-[#00f2fe] border border-[#00f2fe]/30 px-3.5 py-1 rounded-full font-black uppercase tracking-wider">
-              HQ Construction Bonus!
-            </span>
-
-            <h3 className="text-xl font-black text-white mt-3 uppercase tracking-tight">
-              Select Your HQ Reward
-            </h3>
-            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-              HQ commands offer you a construction permit or raw capital. Choose wisely to upgrade your standing.
-            </p>
-
-            <div className="w-full mt-6 space-y-3">
-              <button
-                onClick={handleAcceptFreeHqUpgrade}
-                className="w-full bg-gradient-to-r from-[#00f2fe] to-[#7f00ff] hover:opacity-90 active:scale-95 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
-              >
-                🛠️ Upgrade HQ Base (Free Permit)
-              </button>
-              <button
-                onClick={handleClaimBonusCoins}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-[#f9d423] border border-[#f9d423]/30 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
-              >
-                🪙 Claim +150 Coins
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
-const compressImageHelper = (base64Str: string): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 800;
-      const MAX_HEIGHT = 800;
-      let width = img.width;
-      let height = img.height;
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { authUser, initialLoading } = useAuth();
+  if (initialLoading) return <LoadingScreen />;
+  if (authUser) return <Navigate to="/patrol" replace />;
+  return <>{children}</>;
+}
 
-      if (width > height) {
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-      } else {
-        if (height > MAX_HEIGHT) {
-          width *= MAX_HEIGHT / height;
-          height = MAX_HEIGHT;
-        }
-      }
-      
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-      resolve(dataUrl.substring(dataUrl.indexOf(";base64,") + 8));
-    };
-    img.onerror = () => {
-      resolve(base64Str.replace(/^data:image\/[a-z]+;base64,/, ""));
-    };
-    img.src = base64Str.startsWith('data:image') ? base64Str : `data:image/jpeg;base64,${base64Str}`;
-  });
-};
+function LandingRoute() {
+  const { user, authUser } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <LandingView
+      user={user}
+      isAuthenticated={!!authUser}
+      onLogin={() => navigate("/login")}
+      onSignup={() => navigate("/signup")}
+      onStartMission={() => navigate("/patrol")}
+      onViewProfile={() => navigate("/profile")}
+      onViewLeaderboard={() => navigate("/leaderboard")}
+      onViewMaps={() => navigate("/maps")}
+    />
+  );
+}
+
+function LoginRoute() {
+  const navigate = useNavigate();
+  return <LoginView onSwitchToSignup={() => navigate("/signup")} onGoHome={() => navigate("/")} />;
+}
+
+function SignupRoute() {
+  const navigate = useNavigate();
+  return <SignupView onSwitchToLogin={() => navigate("/login")} onGoHome={() => navigate("/")} />;
+}
+
+function PatrolRoute() {
+  const { user, cases, hood, playerPos, setPlayerPos, handleVerifyCase, handleResolveCase, handleTriggerScan, handleTriggerDispatcher, selectedCaseIdFromChat, setSelectedCaseIdFromChat } = useAuth();
+  if (!user) return null;
+  return (
+    <GameView
+      cases={cases}
+      user={user}
+      hood={hood}
+      playerPos={playerPos}
+      setPlayerPos={setPlayerPos}
+      onVerifyCase={handleVerifyCase}
+      onResolveCase={handleResolveCase}
+      onTriggerScan={handleTriggerScan}
+      onTriggerDispatcher={handleTriggerDispatcher}
+      selectedCaseIdFromChat={selectedCaseIdFromChat}
+      setSelectedCaseIdFromChat={setSelectedCaseIdFromChat}
+    />
+  );
+}
+
+function MapsRoute() {
+  const { user, cases, playerPos, setPlayerPos, handleTriggerScan } = useAuth();
+  if (!user) return null;
+  return (
+    <RoutePlannerView
+      key={`route-${user.userId}`}
+      cases={cases}
+      playerPos={playerPos}
+      setPlayerPos={setPlayerPos}
+      onTriggerScan={handleTriggerScan}
+    />
+  );
+}
+
+function CommunityRoute() {
+  const { user, hood, leaderboard, liveActivities, agentModels } = useAuth();
+  const navigate = useNavigate();
+  if (!user || !hood) return null;
+  return (
+    <CommunityView
+      key={`community-${user.userId}-${hood.id}`}
+      hood={hood}
+      leaderboard={leaderboard}
+      liveActivities={liveActivities}
+      user={user}
+      moderatorModel={agentModels.moderator}
+      onViewCaseOnMap={() => navigate("/patrol")}
+    />
+  );
+}
+
+function AdminRoute() {
+  const { user, agentModels, setAgentModels, triggerToast } = useAuth();
+  if (!user?.isAdmin) return null;
+  return (
+    <AdminView
+      key={`admin-${user.userId}`}
+      user={user}
+      agentModels={agentModels}
+      onAgentModelChange={(agent, model) => {
+        const updated = { ...agentModels, [agent]: model };
+        setAgentModels(updated);
+        localStorage.setItem("nagarika_agent_models_v2", JSON.stringify(updated));
+        triggerToast(`Model for ${agent.toUpperCase()} Agent set to ${model}!`, "success");
+      }}
+    />
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <LanguageProvider>
+        <AuthProvider>
+          <ShellLayout>
+          <Routes>
+            <Route path="/" element={<PublicRoute><LandingRoute /></PublicRoute>} />
+            <Route path="/login" element={<PublicRoute><LoginRoute /></PublicRoute>} />
+            <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
+            <Route path="/patrol" element={<ProtectedRoute><PatrolRoute /></ProtectedRoute>} />
+            <Route path="/report" element={<ProtectedRoute><ReportIssuePage /></ProtectedRoute>} />
+            <Route path="/issues/:id" element={<ProtectedRoute><IssueDetailPage /></ProtectedRoute>} />
+            <Route path="/maps" element={<ProtectedRoute><MapsRoute /></ProtectedRoute>} />
+            <Route path="/community" element={<ProtectedRoute><CommunityRoute /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><AdminRoute /></ProtectedRoute>} />
+            <Route path="/scan-result" element={<ProtectedRoute><ScanResultPage /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ShellLayout>
+        </AuthProvider>
+      </LanguageProvider>
+    </BrowserRouter>
+  );
+}

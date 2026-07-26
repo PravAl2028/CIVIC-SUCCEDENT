@@ -1,27 +1,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const RESOLVER_SYSTEM_PROMPT = `You are the Resolver Agent for Civic Succedent.
+const RESOLVER_SYSTEM_PROMPT = `You are the Resolver Agent for Nagarika.
 
 Your job is to compare a BEFORE photo (original damage report) with an AFTER photo (new photo of the same location) to determine if the infrastructure issue has been resolved.
 
-Analyze both images and determine:
-1. RESOLUTION STATUS: fully_resolved, partially_resolved, unchanged, or worsened
-2. CONFIDENCE: How confident are you in this assessment (0-100)?
-3. EXPLANATION: What visual evidence supports your conclusion?
-4. QUALITY ASSESSMENT: If resolved, rate the repair quality (1-10)
+ANALYZE BOTH IMAGES CAREFULLY and determine:
 
-Consider:
-- **DETECT SCREEN / PAPER RE-PHOTOGRAPHY IN AFTER PHOTO (ANTI-FRAUD)**:
-  - Inspect the **AFTER** photo to ensure it is a real, primary, direct photo of the outdoor location.
-  - Check for signs of re-photography: computer screen borders, laptop bezels, TV edges, moire pixel pattern grids, glare/reflection on monitor glass, physical paper sheet edges, paper folds/creases, or hands holding a printed photo.
-  - If you detect that the **AFTER** photo is a picture of a screen or paper showing a resolved state, you MUST reject the resolution: set "resolutionStatus" to "unchanged", "confidence" to 100, and state "REJECTED: The after photo is a picture of a screen or paper print displaying a resolved state. Submissions must show the real physical outdoor location." in the explanation.
-- Changes in road/surface condition between photos
-- The photos may be taken from different angles or at different times of day
-- Look for fresh asphalt/cement patches, construction materials, or equipment
-- Partial fixes (e.g., temporary patch over a larger crack) should be "partially_resolved"
-- If the damage appears worse or expanded, mark as "worsened"
+1. LOCATION VERIFICATION (MANDATORY FIRST CHECK):
+   - Verify both photos show the SAME physical location by comparing background landmarks, building facades, road markings, tree positions, utility poles, wall textures, and nearby structures.
+   - Check camera angle and distance consistency — the after photo should be taken from a roughly similar vantage point (same street, same side, similar height).
+   - If the backgrounds do NOT match (different street, different building, different environment), immediately REJECT: set resolutionStatus to "unchanged", confidence to 100, and explanation to "REJECTED: The after photo does not show the same location as the original report. Background landmarks, surroundings, or street context do not match."
 
-Be conservative — only mark as "fully_resolved" if the damage is clearly and completely repaired.`;
+2. IMAGE AUTHENTICITY (ANTI-FRAUD):
+   - Inspect the AFTER photo to ensure it is a real, primary, direct photo of the outdoor location.
+   - Check for signs of re-photography: computer screen borders, laptop bezels, TV edges, moire pixel pattern grids, glare/reflection on monitor glass, physical paper sheet edges, paper folds/creases, or hands holding a printed photo.
+   - Check for AI-generated or heavily edited images: unnatural lighting, inconsistent shadows, blurred or warped edges around the repaired area, repeating textures.
+   - If you detect fraud or re-photography, REJECT: set resolutionStatus to "unchanged", confidence to 100, and explanation to "REJECTED: The after photo shows signs of being a photo of a screen, a printed image, or an AI-generated/editable image. Submissions must be a real, direct photo of the physical outdoor location."
+
+3. RESOLUTION ASSESSMENT:
+   - RESOLUTION STATUS: fully_resolved, partially_resolved, unchanged, or worsened
+   - CONFIDENCE: How confident are you (0-100)?
+   - EXPLANATION: What specific visual evidence supports your conclusion? Reference specific landmarks or features visible in both photos.
+   - QUALITY ASSESSMENT: If resolved, rate the repair quality (1-10)
+
+SPECIAL CONSIDERATIONS:
+- Changes in road/surface condition between photos (fresh asphalt, cement patches, construction materials)
+- Partial fixes (temporary patch over larger crack) = "partially_resolved"
+- If damage appears worse or expanded = "worsened"
+- Time-of-day or weather differences are acceptable IF the location is clearly the same
+- Be conservative — only mark "fully_resolved" if the damage is clearly and completely repaired
+
+RESPOND WITH VALID JSON matching the required schema.`;
 
 const RESOLVER_SCHEMA = {
   type: Type.OBJECT,
@@ -138,7 +147,7 @@ export async function runResolverAgent(
         {
           role: "user",
           parts: [
-            { text: "Compare these two photos. The FIRST image is the original damage report. The SECOND image is a new photo of the same location. Has the issue been resolved?" },
+            { text: "Compare these two photos carefully. The FIRST image is the BEFORE photo (original damage report). The SECOND image is the AFTER photo (new photo claimed to be the same location after repair).\n\nIMPORTANT: First verify both photos show the SAME location by matching background landmarks, buildings, road features, and surroundings. Then assess whether the infrastructure issue has been resolved. Check for anti-fraud signals (screen captures, paper re-photos, AI-generated images). Provide your assessment as JSON." },
             { inlineData: { mimeType: "image/jpeg", data: beforeImageBase64 } },
             { inlineData: { mimeType: "image/jpeg", data: afterImageBase64 } }
           ]

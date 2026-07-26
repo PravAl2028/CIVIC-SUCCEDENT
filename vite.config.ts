@@ -15,8 +15,7 @@ export default defineConfig(() => {
       'process.env.GOOGLE_MAPS_PLATFORM_KEY': JSON.stringify(process.env.GOOGLE_MAPS_PLATFORM_KEY || '')
     },
     server: {
-      hmr: false,
-      watch: null,
+      port: 5173,
     },
   };
 });

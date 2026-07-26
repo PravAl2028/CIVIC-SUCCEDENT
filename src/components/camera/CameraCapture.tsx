@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, RefreshCw, X, Circle, AlertTriangle } from "lucide-react";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface CameraCaptureProps {
   onCapture: (base64Data: string, lat?: number, lng?: number) => void;
@@ -7,15 +8,27 @@ interface CameraCaptureProps {
 }
 
 export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
+  const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
+  // Monotonically increasing session ID — prevents stale getUserMedia resolutions
+  // from leaking streams when startCamera() is called multiple times (e.g. React StrictMode).
+  const cameraSessionRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     checkGps();
+    return () => {
+      mountedRef.current = false;
+      // Increment session to invalidate any in-flight getUserMedia calls
+      cameraSessionRef.current++;
+      stopCamera();
+    };
   }, []);
 
   useEffect(() => {
@@ -23,6 +36,8 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       startCamera();
     }
     return () => {
+      // Increment session to invalidate any in-flight getUserMedia calls
+      cameraSessionRef.current++;
       stopCamera();
     };
   }, [facingMode, gpsError]);
@@ -54,6 +69,10 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
     setError(null);
     stopCamera();
 
+    // Capture the session ID BEFORE the async call — if it changes by the time
+    // getUserMedia resolves, this call is stale and the stream must be discarded.
+    const thisSession = ++cameraSessionRef.current;
+
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera API is not supported or is blocked in this browser sandbox environment.");
@@ -69,12 +88,23 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      // If component unmounted OR a newer startCamera() call has been issued,
+      // this stream is stale — stop it immediately to release the camera.
+      if (!mountedRef.current || cameraSessionRef.current !== thisSession) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       setLoading(false);
     } catch (err: any) {
+      // Don't update state if this call is stale
+      if (cameraSessionRef.current !== thisSession) return;
+
       console.error("Camera access error:", err);
       const isPermissionDenied = 
         err?.name === "NotAllowedError" || 
@@ -91,9 +121,16 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   };
 
   const stopCamera = () => {
+    // Stop all active media tracks to release the camera hardware
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+    // Clear the video element's srcObject reference — some browsers (Chromium)
+    // keep the camera LED on if the <video> still holds a stream reference.
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
     }
   };
 
@@ -157,7 +194,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         </button>
         <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/10 backdrop-blur-sm">
           <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-          <span className="text-xs font-bold tracking-widest uppercase">LIVE AR SCOUTING</span>
+          <span className="text-xs font-bold tracking-widest uppercase">{t.camera?.liveArScouting || "LIVE AR SCOUTING"}</span>
         </div>
         <button
           onClick={toggleFacingMode}
@@ -173,14 +210,14 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         {loading && !hasError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-medium text-zinc-400">Booting scanning lenses...</p>
+            <p className="text-sm font-medium text-zinc-400">{t.camera?.bootingLenses || "Booting scanning lenses..."}</p>
           </div>
         )}
 
         {gpsError ? (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-zinc-950/95 border border-zinc-800 p-5 rounded-2xl shadow-2xl backdrop-blur-md text-center max-w-[280px] w-full">
             <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-2 animate-pulse" />
-            <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide uppercase">Location Access Required</h3>
+            <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide uppercase">{t.camera?.locationRequired || "Location Access Required"}</h3>
             <p className="text-[10px] text-zinc-400 mb-4 leading-relaxed">{gpsError}</p>
             <div className="flex flex-col gap-2">
               <button
@@ -190,7 +227,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
                 }}
                 className="w-full bg-[#006a65] text-white font-extrabold text-xs uppercase tracking-wider py-3 rounded-xl hover:bg-teal-700 active:scale-95 transition-all cursor-pointer shadow-md"
               >
-                Retry GPS Access
+                {t.camera?.retryGps || "Retry GPS Access"}
               </button>
               <button
                 onClick={onClose}
@@ -203,7 +240,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         ) : error ? (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-zinc-950/95 border border-zinc-800 p-5 rounded-2xl shadow-2xl backdrop-blur-md text-center max-w-[280px] w-full">
             <Camera className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-            <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide uppercase">Camera Access Required</h3>
+            <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide uppercase">{t.camera?.cameraRequired || "Camera Access Required"}</h3>
             <p className="text-[10px] text-zinc-400 mb-4 leading-relaxed">{error}</p>
             <div className="flex flex-col gap-2">
               <button
@@ -212,7 +249,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
                 }}
                 className="w-full bg-[#006a65] text-white font-extrabold text-xs uppercase tracking-wider py-3 rounded-xl hover:bg-teal-700 active:scale-95 transition-all cursor-pointer shadow-md"
               >
-                Retry Camera Access
+                {t.camera?.retryCamera || "Retry Camera Access"}
               </button>
               <button
                 onClick={onClose}
@@ -247,7 +284,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       <div className="w-full pb-10 pt-6 px-6 bg-gradient-to-t from-black/80 to-transparent absolute bottom-0 left-0 z-10 flex flex-col items-center gap-4">
         {!hasError && (
           <p className="text-xs text-zinc-400 font-medium text-center max-w-xs">
-            Center the infrastructure damage (pothole, streetlight, water leak, etc.) inside the yellow guide frames.
+            {t.camera?.guideFrameText || "Center the infrastructure damage (pothole, streetlight, water leak, etc.) inside the yellow guide frames."}
           </p>
         )}
         <div className="flex justify-center items-center w-full relative">

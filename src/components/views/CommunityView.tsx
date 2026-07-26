@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Users, Trophy, ShieldAlert, Eye, CheckCircle2, MessageSquare, Send, Map, Search, ChevronDown, X, Plus, Info } from "lucide-react";
 import { Hood } from "../../lib/constants";
 import { auth, db } from "../../firebase";
-import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc, increment } from 'firebase/firestore';
+import { useLanguage } from "../../context/LanguageContext";
+import { getTranslatedRank } from "../../lib/i18nHelpers";
 
 interface CommunityViewProps {
   key?: string;
@@ -33,6 +35,8 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isFabExpanded, setIsFabExpanded] = useState(false);
+
+  const { t } = useLanguage();
 
   // Private AI Moderation Warning State
   const [moderationWarning, setModerationWarning] = useState<{
@@ -145,15 +149,33 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
 
   const getSenderRoleInfo = (msg: any, senderInfo: any) => {
     if (msg.senderId === "system_ai") {
-      return { role: "AI Agent", emoji: "🤖", colorClass: "bg-teal-500/10 text-teal-700 border-teal-500/20" };
+      return { role: t.community.aiAgent, emoji: "🤖", colorClass: "bg-teal-500/10 text-teal-700 border-teal-500/20" };
     }
     if (senderInfo?.isAdmin) {
-      return { role: "Admin", emoji: "👑", colorClass: "bg-red-500/10 text-red-700 border-red-500/20" };
+      return { role: t.community.admin, emoji: "👑", colorClass: "bg-red-500/10 text-red-700 border-red-500/20" };
     }
     if (senderInfo?.rank) {
-      return { role: senderInfo.rank, emoji: "🛡️", colorClass: "bg-yellow-500/10 text-[#775a00] border-yellow-500/20" };
+      return { role: getTranslatedRank(senderInfo.rank, t), emoji: "🛡️", colorClass: "bg-yellow-500/10 text-[#775a00] border-yellow-500/20" };
     }
-    return { role: "Citizen", emoji: "👤", colorClass: "bg-zinc-500/10 text-zinc-700 border-zinc-500/20" };
+    return { role: t.community.citizen, emoji: "👤", colorClass: "bg-zinc-500/10 text-zinc-700 border-zinc-500/20" };
+  };
+
+  const formatMessageText = (text: string) => {
+    if (!text) return "";
+    let formatted = text;
+    if (formatted.includes("Level Up Alert!")) {
+      formatted = formatted
+        .replace("Level Up Alert!", t.community.levelUpAlert || "Level Up Alert!")
+        .replace("Congratulations to", t.community.congratsTo || "Congratulations to")
+        .replace("on ranking up to", t.community.onRankingUpTo || "on ranking up to")
+        .replace("Keep making your neighborhood safer!", t.community.keepMakingSafer || "Keep making your neighborhood safer!");
+    }
+    ["SCOUT ELITE", "PATROL RANGER", "RANGER CAPTAIN", "CITY GUARDIAN", "GUARDIAN COMMANDER", "CHAMPION", "LEGEND", "SCOUT"].forEach(r => {
+      if (formatted.includes(r)) {
+        formatted = formatted.replace(r, getTranslatedRank(r, t));
+      }
+    });
+    return formatted;
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -195,6 +217,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
           type: "user",
           createdAt: serverTimestamp()
         });
+        await updateDoc(doc(db, "users", user.userId), { xp: increment(3) });
       } else {
         // Unethical message handling
         const currentWarnings = user.warningsCount || 0;
@@ -307,10 +330,10 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-display font-black text-sm uppercase text-[#006a65] truncate tracking-tight flex items-center gap-1.5">
               <Users className="w-4 h-4 text-[#006a65] flex-shrink-0" />
-              <span className="truncate">{hood.name}</span>
+              <span className="truncate">{hood.name.replace(/COMMUNITY/i, t.community.community || "COMMUNITY")}</span>
             </h2>
             <p className="text-[9px] font-bold text-zinc-400 truncate mt-0.5 uppercase tracking-wide">
-              {hood.city} • Active Community
+              {hood.city} • {t.community.activeCommunity}
             </p>
           </div>
 
@@ -344,7 +367,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               className="bg-white border border-zinc-200 text-zinc-700 text-[10px] font-extrabold uppercase rounded-lg pl-2 pr-6 py-1 outline-none cursor-pointer focus:border-[#006a65] appearance-none"
             >
               {areas.map(area => (
-                <option key={area} value={area}>{area}</option>
+                <option key={area} value={area}>{area === "ALL AREAS" ? (t.community.allAreas || "ALL AREAS") : area}</option>
               ))}
             </select>
             <ChevronDown className="w-3 h-3 text-zinc-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -358,7 +381,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chat..."
+              placeholder={t.community.searchChat}
               className="w-full bg-transparent text-[10px] font-semibold outline-none text-zinc-800 placeholder-zinc-400 border-none p-0 focus:ring-0 focus:outline-none"
             />
             {searchQuery && (
@@ -436,7 +459,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
                 {isClickableCase && (
                   <span className="inline-flex items-center gap-1.5 mt-2.5 text-[9px] text-[#006a65] font-black uppercase tracking-wider bg-[#006a65]/5 px-2.5 py-1 rounded-xl border border-[#006a65]/15 transition-all">
                     <Map className="w-3 h-3 text-[#006a65]" />
-                    Tap to view on map
+                    {t.community.tapToViewOnMap}
                   </span>
                 )}
               </div>
@@ -445,7 +468,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
         })}
         {filteredMessages.length === 0 && (
           <div className="text-center text-zinc-400 text-xs py-10 font-bold bg-white/50 border border-zinc-200/50 rounded-2xl p-4">
-            No updates found. Tweak filters or search query!
+            {t.community.noUpdates}
           </div>
         )}
       </div>
@@ -454,7 +477,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
       <form onSubmit={handleSendMessage} className="bg-white border-t border-zinc-200 py-3.5 px-4 -mx-6 relative z-10 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] shrink-0">
         {(user?.isBlocked || moderationWarning?.blocked) ? (
           <div className="w-full bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl text-center border border-red-200">
-            🚫 Account suspended for violating community safety guidelines.
+            {t.community.accountSuspended}
           </div>
         ) : (
           <div className="flex gap-2">
@@ -462,7 +485,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Post community update..."
+              placeholder={t.community.postUpdate}
               disabled={chatLoading}
               className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#006a65] focus:bg-white transition-all disabled:opacity-50 text-zinc-800 placeholder-zinc-400"
             />
@@ -493,7 +516,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               }}
               className="flex items-center gap-2 bg-[#006a65] text-white px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg hover:bg-[#005e55] transition-all cursor-pointer border border-[#006a65]/20"
             >
-              <span>🚨 Report Issue</span>
+              <span>{t.community.reportIssue}</span>
             </button>
 
             {/* Leaderboard Action */}
@@ -504,7 +527,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               }}
               className="flex items-center gap-2 bg-white text-zinc-855 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg hover:bg-zinc-50 transition-all cursor-pointer border border-zinc-200"
             >
-              <span>🏆 Leaderboard</span>
+              <span>{t.community.leaderboard}</span>
             </button>
 
             {/* Community Details Action */}
@@ -515,7 +538,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               }}
               className="flex items-center gap-2 bg-white text-zinc-855 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg hover:bg-zinc-50 transition-all cursor-pointer border border-zinc-200"
             >
-              <span>ℹ️ Community Info</span>
+              <span>{t.community.communityInfo}</span>
             </button>
           </div>
         )}
@@ -528,7 +551,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               ? 'bg-zinc-800 text-white border-zinc-700 rotate-45' 
               : 'bg-[#006a65] text-white border-[#006a65]/20 hover:bg-[#005e55]'
           }`}
-          title="Community Actions"
+          title={t.community.communityActions}
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -545,7 +568,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
             <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-yellow-500" style={{ fill: "currentColor" }} />
-                <h3 className="font-display font-black text-sm uppercase tracking-tight text-zinc-900">Active Hero Leaderboard</h3>
+                <h3 className="font-display font-black text-sm uppercase tracking-tight text-zinc-900">{t.community.activeHeroLeaderboard}</h3>
               </div>
               <button 
                 onClick={() => setIsLeaderboardOpen(false)} 
@@ -582,23 +605,23 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
                         ⭐ {hero.trustScore}%
                       </span>
                     </div>
-                    <p className="text-[10px] text-zinc-400 font-semibold uppercase">{hero.count} verifications</p>
+                    <p className="text-[10px] text-zinc-400 font-semibold uppercase">{t.community.verificationsCount.replace("{count}", String(hero.count))}</p>
                   </div>
                   <div className="bg-zinc-200 px-3 py-1 rounded-xl text-xs font-black text-[#775a00] font-mono whitespace-nowrap">
-                    {hero.points} XP
+                    {t.community.xpPoints.replace("{points}", hero.points)}
                   </div>
                 </div>
               ))}
 
               {top5.length === 0 && (
-                <p className="text-center text-zinc-400 text-xs py-4">No active heroes in this area yet.</p>
+                <p className="text-center text-zinc-400 text-xs py-4">{t.community.noActiveHeroes}</p>
               )}
 
               {/* Logged-in User standing row at the bottom if NOT in Top 5 */}
               {!userIsInTop5 && userRecord && (
                 <div className="border-t border-dashed border-zinc-200 pt-3.5 mt-2">
                   <div className="text-[10px] text-zinc-400 font-black uppercase tracking-wider mb-2 text-center">
-                    Your Standing
+                    {t.community.yourStanding}
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#fbfaf7] border border-[#006a65]/20 relative overflow-hidden">
                     <div className="w-6 text-center font-bold font-mono text-[#006a65] text-sm">
@@ -613,15 +636,15 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
                     </div>
                     <div className="flex-grow min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="font-bold text-xs text-zinc-800 truncate">{userRecord.name} (You)</h4>
+                        <h4 className="font-bold text-xs text-zinc-800 truncate">{userRecord.name} {t.community.you}</h4>
                         <span className="text-[9px] bg-teal-50 text-[#006a65] border border-[#006a65]/20 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">
                           ⭐ {userRecord.trustScore}%
                         </span>
                       </div>
-                      <p className="text-[10px] text-zinc-400 font-semibold uppercase">{userRecord.count} verifications</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold uppercase">{t.community.verificationsCount.replace("{count}", String(userRecord.count))}</p>
                     </div>
                     <div className="bg-[#006a65]/10 px-3 py-1 rounded-xl text-xs font-black text-[#006a65] font-mono whitespace-nowrap">
-                      {userRecord.points} XP
+                      {t.community.xpPoints.replace("{points}", userRecord.points)}
                     </div>
                   </div>
                 </div>
@@ -642,7 +665,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
             <div className="flex justify-between items-center border-b border-[#d2c5ae]/20 pb-3">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#006a65]" />
-                <h3 className="font-display font-black text-sm uppercase tracking-tight text-zinc-900">Community Information</h3>
+                <h3 className="font-display font-black text-sm uppercase tracking-tight text-zinc-900">{t.community.communityInfo}</h3>
               </div>
               <button 
                 onClick={() => setIsInfoOpen(false)} 
@@ -655,27 +678,27 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
             {/* Metrics Dashboard (Moved from main stream cards) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-zinc-50 border border-zinc-150 rounded-2xl p-4.5 text-center shadow-inner">
-                <span className="text-[9px] font-extrabold uppercase text-zinc-400 tracking-wider block">Active Heroes</span>
+                <span className="text-[9px] font-extrabold uppercase text-zinc-400 tracking-wider block">{t.community.activeHeroes}</span>
                 <span className="text-2xl font-black font-mono text-[#006a65] block mt-1">{hood.activeHeroes || 0}</span>
-                <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wide">Patrolling Sector</span>
+                <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wide">{t.community.patrollingSector}</span>
               </div>
               <div className="bg-zinc-50 border border-zinc-150 rounded-2xl p-4.5 text-center shadow-inner">
-                <span className="text-[9px] font-extrabold uppercase text-zinc-400 tracking-wider block">Total Cases</span>
+                <span className="text-[9px] font-extrabold uppercase text-zinc-400 tracking-wider block">{t.community.totalCases}</span>
                 <span className="text-2xl font-black font-mono text-zinc-800 block mt-1">{hood.totalCases || 0}</span>
-                <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wide">Reported Issues</span>
+                <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wide">{t.community.reportedIssues}</span>
               </div>
             </div>
 
             {/* Guidelines */}
             <div className="space-y-3 text-xs leading-relaxed text-zinc-600">
               <div className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl">
-                <h4 className="font-extrabold text-[9px] uppercase text-zinc-400 tracking-widest mb-1">Our Civic Mission</h4>
+                <h4 className="font-extrabold text-[9px] uppercase text-zinc-400 tracking-widest mb-1">{t.community.ourCivicMission}</h4>
                 <p className="text-[11px] text-zinc-500">
-                  Join forces with fellow citizens to scout defects, verify repairs, and restore community pride. Maintain high consensus ratings to earn the trust of your neighborhood.
+                  {t.community.missionDescription}
                 </p>
               </div>
               <div className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl">
-                <h4 className="font-extrabold text-[9px] uppercase text-zinc-400 tracking-widest mb-1.5">Sectors Served</h4>
+                <h4 className="font-extrabold text-[9px] uppercase text-zinc-400 tracking-widest mb-1.5">{t.community.sectorsServed}</h4>
                 <div className="flex flex-wrap gap-1.5">
                   {areas.map(a => (
                     <span key={a} className="text-[9px] bg-zinc-200 text-zinc-700 font-bold px-2 py-0.5 rounded-full border border-zinc-300/30">
@@ -698,23 +721,23 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
             </div>
 
             <h3 className="font-display text-xl font-black text-red-600 uppercase tracking-tight">
-              {moderationWarning.blocked ? "Account Blocked" : "Chat Policy Warning"}
+              {moderationWarning.blocked ? t.community.accountBlocked : t.community.chatPolicyWarning}
             </h3>
 
             <p className="text-zinc-600 text-xs mt-3 leading-relaxed">
               {moderationWarning.blocked ? (
                 <span>
-                  ⚠️ CS AI Warning: Your account has been permanently suspended for unethical behavior. You can no longer participate in chat.
+                  ⚠️ {t.community.blockedMessage}
                 </span>
               ) : (
                 <span>
-                  ⚠️ CS AI Warning: Please keep chat ethical. Warning <strong>{moderationWarning.warningCount}/3</strong>. Your message was blocked.
+                  ⚠️ {t.community.warningMessage.replace("{count}", String(moderationWarning.warningCount))}
                 </span>
               )}
             </p>
 
             <div className="w-full bg-red-50/50 border border-red-100 rounded-xl p-3 my-4 text-left">
-              <span className="text-[9px] text-red-700 font-extrabold uppercase tracking-wider block">AI Moderation Analysis</span>
+              <span className="text-[9px] text-red-700 font-extrabold uppercase tracking-wider block">{t.community.aiModerationAnalysis}</span>
               <span className="text-xs text-red-950 font-medium block mt-1 leading-normal">{moderationWarning.reason}</span>
             </div>
 
@@ -723,7 +746,7 @@ export default function CommunityView({ hood, user, moderatorModel, initialLeade
               onClick={() => setModerationWarning(null)}
               className="w-full bg-red-600 text-white py-3 rounded-xl font-bold text-sm shadow-md hover:bg-red-700 active:scale-95 transition-all cursor-pointer"
             >
-              Understand & Continue
+              {t.community.understandContinue}
             </button>
           </div>
         </div>

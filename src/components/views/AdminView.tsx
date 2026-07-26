@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Shield, AlertTriangle, UserX, CheckCircle, RefreshCcw, Users, Brain, ChevronRight, X } from "lucide-react";
+import { Shield, AlertTriangle, UserX, CheckCircle, RefreshCcw, Users, Brain, ChevronRight, X, TrendingUp, Clock, BarChart3 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+
+const CHART_COLORS = ["#006a65", "#f0c040", "#7c3aed", "#e11d48", "#0891b2", "#d97706", "#059669", "#6366f1"];
 
 const BASELINE_CITY_DATA: Record<string, string[]> = {
   "Hyderabad": ["Tirumalagiri", "Secunderabad", "Ameerpet", "Kukatpally", "Gachibowli", "Madhapur", "Begumpet", "Banjara Hills", "Jubilee Hills", "Malkajgiri", "LB Nagar", "Dilsukhnagar", "Uppal", "Miyapur", "Kompally", "Mehdipatnam", "Tarnaka", "Habsiguda"],
@@ -246,6 +249,56 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
 
   const blockedUsers = usersList.filter(u => u.isBlocked && (u.warningsCount || 0) >= 3);
 
+  // ── Analytics computations (merged from AnalyticsPage) ──
+  const analyticsSource = filteredCases;
+  const totalIssues = analyticsSource.length;
+  const resolvedCount = analyticsSource.filter(c => c.status === "resolved").length;
+  const activeCount = analyticsSource.filter(c => c.status !== "resolved").length;
+  const resolutionRate = totalIssues > 0 ? Math.round((resolvedCount / totalIssues) * 100) : 0;
+
+  const avgSeverity = useMemo(() => {
+    if (analyticsSource.length === 0) return "0.0";
+    const sum = analyticsSource.reduce((acc, c) => acc + (c.severity || 0), 0);
+    return (sum / analyticsSource.length).toFixed(1);
+  }, [analyticsSource]);
+
+  const categoryData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    analyticsSource.forEach(c => {
+      const cat = (c.damageType || "other").replace(/_/g, " ");
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [analyticsSource]);
+
+  const statusData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    analyticsSource.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [analyticsSource]);
+
+  const severityData = useMemo(() => {
+    const ranges: Record<string, number> = { "1-3 Minor": 0, "4-6 Moderate": 0, "7-9 Severe": 0, "10 Critical": 0 };
+    analyticsSource.forEach(c => {
+      const s = c.severity || 0;
+      if (s <= 3) ranges["1-3 Minor"]++;
+      else if (s <= 6) ranges["4-6 Moderate"]++;
+      else if (s <= 9) ranges["7-9 Severe"]++;
+      else ranges["10 Critical"]++;
+    });
+    return Object.entries(ranges).map(([name, value]) => ({ name, value }));
+  }, [analyticsSource]);
+
+  const timelineData = useMemo(() => {
+    const dayMap: Record<string, number> = {};
+    analyticsSource.forEach(c => {
+      const d = new Date(c.createdAt);
+      const key = `${d.getMonth() + 1}/${d.getDate()}`;
+      dayMap[key] = (dayMap[key] || 0) + 1;
+    });
+    return Object.entries(dayMap).map(([date, count]) => ({ date, count })).slice(-14);
+  }, [analyticsSource]);
+
   return (
     <div className="p-6 bg-[#F5F0E8] min-h-screen font-sans pb-24 max-w-4xl mx-auto space-y-6">
       
@@ -351,115 +404,172 @@ export default function AdminView({ user, agentModels, onAgentModelChange }: Adm
         </div>
       </div>
 
+      {/* ── ANALYTICS SECTION (merged from Analytics page) ── */}
+      <section className="bg-white p-6 rounded-3xl border border-zinc-150 shadow-sm space-y-5">
+        <div className="flex items-center gap-2 border-b pb-2">
+          <BarChart3 className="w-5 h-5 text-[#006a65]" />
+          <h3 className="font-display text-lg font-bold text-[#775a00] uppercase">
+            Analytics Overview
+          </h3>
+          {selectedCity !== "All" && (
+            <span className="ml-auto text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              Filtered: {selectedCity}{selectedArea !== "All" ? ` › ${selectedArea}` : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Mini Stat Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-[9px] font-bold text-zinc-400 uppercase">Active</span>
+            </div>
+            <p className="text-xl font-black text-amber-600">{activeCount}</p>
+          </div>
+          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-[9px] font-bold text-zinc-400 uppercase">Resolved</span>
+            </div>
+            <p className="text-xl font-black text-emerald-600">{resolvedCount}</p>
+          </div>
+          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3.5 h-3.5 text-[#006a65]" />
+              <span className="text-[9px] font-bold text-zinc-400 uppercase">Resolution</span>
+            </div>
+            <p className="text-xl font-black text-[#006a65]">{resolutionRate}%</p>
+          </div>
+          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-[9px] font-bold text-zinc-400 uppercase">Avg Severity</span>
+            </div>
+            <p className="text-xl font-black text-indigo-600">{avgSeverity}</p>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Issues by Category */}
+          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+            <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mb-3">Issues by Category</h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={categoryData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 8 }} angle={-20} textAnchor="end" height={50} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#006a65" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Resolution Status Pie */}
+          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+            <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mb-3">Resolution Status</h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                  {statusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Severity Distribution */}
+          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+            <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mb-3">Severity Distribution</h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={severityData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {severityData.map((_, i) => <Cell key={i} fill={["#059669", "#f59e0b", "#dc2626", "#7c2d12"][i]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Reports Over Time */}
+          {timelineData.length > 0 && (
+            <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+              <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mb-3">Reports Over Time</h4>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={timelineData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#006a65" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* AI AGENT ENGINE CONFIG (ADMIN ONLY) */}
       {agentModels && onAgentModelChange && (
-        <section className="bg-white p-6 rounded-3xl border border-zinc-150 shadow-sm space-y-6">
+        <section className="bg-white p-4 rounded-3xl border border-zinc-150 shadow-sm space-y-3">
           <div className="flex items-center gap-2 border-b pb-2">
-            <Brain className="w-5 h-5 text-[#006a65]" />
-            <h3 className="font-display text-lg font-bold text-[#775a00] uppercase">
-              AI Agent Engine Config (Admin Only)
+            <Brain className="w-4 h-4 text-[#006a65]" />
+            <h3 className="font-display text-sm font-bold text-[#775a00] uppercase">
+              AI Agent Config
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {/* 1. Scanner Agent */}
-            <div className="space-y-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Agent 01</span>
-                <h4 className="font-bold text-sm text-zinc-800">📸 Scanner Agent</h4>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Analyzes citizen-uploaded photograph metadata to validate infrastructure damage and filter fraud reports.
-                </p>
-              </div>
-              <div className="relative mt-4">
-                <select
-                  value={agentModels.scanner}
-                  onChange={(e) => onAgentModelChange("scanner", e.target.value)}
-                  className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer pr-10"
-                >
-                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                  <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                  <ChevronRight className="w-4 h-4 transform rotate-90" />
-                </div>
-              </div>
+            <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1.5">
+              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">01</span>
+              <h4 className="font-bold text-[11px] text-zinc-800">📸 Scanner</h4>
+              <p className="text-[9px] text-zinc-500 leading-snug">Validates photos, detects fraud, scores severity.</p>
+              <select value={agentModels.scanner} onChange={(e) => onAgentModelChange("scanner", e.target.value)} className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer">
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B</option>
+              </select>
             </div>
 
             {/* 2. Dispatcher Agent */}
-            <div className="space-y-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Agent 02</span>
-                <h4 className="font-bold text-sm text-zinc-800">✉️ Dispatcher Agent</h4>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Compiles formal petitions and official complaint letters to municipal government departments.
-                </p>
-              </div>
-              <div className="relative mt-4">
-                <select
-                  value={agentModels.dispatcher}
-                  onChange={(e) => onAgentModelChange("dispatcher", e.target.value)}
-                  className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer pr-10"
-                >
-                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                  <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                  <ChevronRight className="w-4 h-4 transform rotate-90" />
-                </div>
-              </div>
+            <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1.5">
+              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">02</span>
+              <h4 className="font-bold text-[11px] text-zinc-800">✉️ Dispatcher</h4>
+              <p className="text-[9px] text-zinc-500 leading-snug">Drafts formal complaint letters with RTI queries.</p>
+              <select value={agentModels.dispatcher} onChange={(e) => onAgentModelChange("dispatcher", e.target.value)} className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer">
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B</option>
+              </select>
             </div>
 
             {/* 3. Resolver Agent */}
-            <div className="space-y-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Agent 03</span>
-                <h4 className="font-bold text-sm text-zinc-800">✅ Resolver Agent</h4>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Compares original defect photos with citizen-submitted resolution photos to verify successful repairs.
-                </p>
-              </div>
-              <div className="relative mt-4">
-                <select
-                  value={agentModels.resolver}
-                  onChange={(e) => onAgentModelChange("resolver", e.target.value)}
-                  className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer pr-10"
-                >
-                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                  <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                  <ChevronRight className="w-4 h-4 transform rotate-90" />
-                </div>
-              </div>
+            <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1.5">
+              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">03</span>
+              <h4 className="font-bold text-[11px] text-zinc-800">✅ Resolver</h4>
+              <p className="text-[9px] text-zinc-500 leading-snug">Compares before/after photos to verify repair.</p>
+              <select value={agentModels.resolver} onChange={(e) => onAgentModelChange("resolver", e.target.value)} className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer">
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B</option>
+              </select>
             </div>
 
             {/* 4. Moderator Agent */}
-            <div className="space-y-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Agent 04</span>
-                <h4 className="font-bold text-sm text-zinc-800">💬 Moderator Agent</h4>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  Actively monitors the community group chat, automatically scanning and flagging toxic or unethical posts.
-                </p>
-              </div>
-              <div className="relative mt-4">
-                <select
-                  value={agentModels.moderator}
-                  onChange={(e) => onAgentModelChange("moderator", e.target.value)}
-                  className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer pr-10"
-                >
-                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                  <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                  <ChevronRight className="w-4 h-4 transform rotate-90" />
-                </div>
-              </div>
+            <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1.5">
+              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">04</span>
+              <h4 className="font-bold text-[11px] text-zinc-800">💬 Moderator</h4>
+              <p className="text-[9px] text-zinc-500 leading-snug">Filters toxic chat, tracks 3-strike warnings.</p>
+              <select value={agentModels.moderator} onChange={(e) => onAgentModelChange("moderator", e.target.value)} className="w-full bg-white text-zinc-800 border border-zinc-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:outline-none focus:border-[#006a65] appearance-none cursor-pointer">
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B</option>
+              </select>
             </div>
           </div>
         </section>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, useMapEvents } from "react-leaflet";
+import { useNavigate } from "react-router-dom";
 import L from "leaflet";
-import { motion, useMotionValue, useTransform, animate } from "motion/react";
+import { motion, useMotionValue, useTransform, animate, useDragControls } from "motion/react";
 import { 
   Compass, Locate, MapPin, AlertTriangle, CheckCircle2, Droplets, Lightbulb, Trash2, 
   Navigation, Map, Settings, Check, Search, ArrowRight, ChevronRight, 
-  ShieldAlert, Sparkles, Clock, ArrowLeftRight, AlertCircle, RefreshCw, Layers,
-  Volume2, VolumeX, Play, Square, Trophy, Milestone, Zap, Smartphone, Gamepad2, Plus, Minus,
+  ShieldAlert, Clock, ArrowLeftRight, AlertCircle, RefreshCw, Layers,
+  Volume2, VolumeX, Play, Square, Milestone, Zap, Smartphone, Gamepad2, Plus, Minus,
   X, Mic, CornerUpLeft, CornerUpRight, MoveUp, ShieldCheck, Camera, ArrowLeft
 } from "lucide-react";
 import { Case, DamageType } from "../../lib/constants";
@@ -16,6 +17,8 @@ import { calculateSafetyScore, computeSafetyIndex } from "../../lib/routing/safe
 import { getHazardRadius, getIntersectingHazards, checkHazardIntersections } from "../../lib/routing/hazardAnalyzer";
 import * as turf from '@turf/turf';
 import { createNavigationSession } from "../../lib/navigationEngine";
+import { useLanguage } from "../../context/LanguageContext";
+import { getTranslatedDamageType } from "../../lib/i18nHelpers";
 
 // Custom Map Interaction hook to capture map click points
 function RouteMapEvents({ 
@@ -194,6 +197,9 @@ interface RoutePlannerViewProps {
 }
 
 function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: RoutePlannerViewProps) {
+  const navigate = useNavigate();
+  const { t } = useLanguage();
+  const dragControls = useDragControls();
   // Inputs & Selections
   const [isAutoCentering, setIsAutoCentering] = useState(true);
   const [startPoint, setStartPoint] = useState<{ lat: number; lng: number } | null>(null);
@@ -217,6 +223,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   const [clickMode, setClickMode] = useState<"start" | "end" | null>(null);
   const [isMapSelectionActive, setIsMapSelectionActive] = useState<boolean>(false);
   const [avoidanceEnabled, setAvoidanceEnabled] = useState<boolean>(true);
+  const [minSeverity, setMinSeverity] = useState<number>(1);
   const [mapTheme, setMapTheme] = useState<"dark" | "light">("light");
   const isDark = mapTheme === "dark";
 
@@ -243,6 +250,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     endLat: number;
     endLng: number;
     avoidTypesStr: string;
+    minSeverity?: number;
     preference: string;
     toggle: number;
   } | null>(null);
@@ -254,8 +262,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   const [navIndex, setNavIndex] = useState<number>(0);
   const [navCurrentPos, setNavCurrentPos] = useState<[number, number] | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
-  const [rideXP, setRideXP] = useState<number>(0);
-  const [rideSP, setRideSP] = useState<number>(0);
   const [rideCompleted, setRideCompleted] = useState<boolean>(false);
 
   // Preset destinations
@@ -576,6 +582,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       endLat: endPoint.lat,
       endLng: endPoint.lng,
       avoidTypesStr: JSON.stringify(avoidTypes),
+      minSeverity,
       preference: routingPreference,
       toggle: forceFetchToggle
     };
@@ -588,6 +595,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       Math.abs(lastFetchedParamsRef.current.endLat - currentParams.endLat) < 0.00001 &&
       Math.abs(lastFetchedParamsRef.current.endLng - currentParams.endLng) < 0.00001 &&
       lastFetchedParamsRef.current.avoidTypesStr === currentParams.avoidTypesStr &&
+      lastFetchedParamsRef.current.minSeverity === currentParams.minSeverity &&
       lastFetchedParamsRef.current.preference === currentParams.preference &&
       lastFetchedParamsRef.current.toggle === currentParams.toggle
     ) {
@@ -607,7 +615,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
       setRoutingError(null);
 
       // Cache lookup
-      const cacheKey = `${startPoint.lat.toFixed(5)},${startPoint.lng.toFixed(5)}|${endPoint.lat.toFixed(5)},${endPoint.lng.toFixed(5)}|${JSON.stringify(avoidTypes)}|${routingPreference}`;
+      const cacheKey = `${startPoint.lat.toFixed(5)},${startPoint.lng.toFixed(5)}|${endPoint.lat.toFixed(5)},${endPoint.lng.toFixed(5)}|${JSON.stringify(avoidTypes)}|${minSeverity}|${routingPreference}`;
       if (routeCacheRef.current[cacheKey]) {
         const cached = routeCacheRef.current[cacheKey];
         setRoadRoute(cached.roadRoute);
@@ -628,7 +636,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
 
       try {
         const currentActiveHazards = cases.filter(c => 
-          c.status !== "resolved" && avoidTypes[c.damageType]
+          c.status !== "resolved" && avoidTypes[c.damageType] && (c.severity || 5) >= minSeverity
         );
 
         // Compute Fastest Route
@@ -696,10 +704,10 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     return () => {
       clearTimeout(delayTimer);
     };
-  }, [startPoint, endPoint, avoidTypes, routingPreference, forceFetchToggle]);
+  }, [startPoint, endPoint, avoidTypes, minSeverity, routingPreference, forceFetchToggle]);
 
   const activeHazards = cases.filter(c => 
-    c.status !== "resolved" && avoidTypes[c.damageType]
+    c.status !== "resolved" && avoidTypes[c.damageType] && (c.severity || 5) >= minSeverity
   );
 
   // Get active selected path
@@ -873,10 +881,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
           if (distToEnd < 20) { // arrived within 20 meters!
             setIsRiding(false);
             setRideCompleted(true);
-            const earnedPoints = 150 + encounteredHazards.length * 50;
-            setRideXP(earnedPoints);
-            setRideSP(earnedPoints);
-            speakText("Congratulations! You have arrived at your destination safely. Safe rider bonus issued.");
+            speakText("Congratulations! You have arrived at your destination safely.");
           }
 
           // Proximity alerts for active hazards on the map
@@ -912,23 +917,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
     };
   }, [isRiding, endPoint]);
 
-  const getScoutPointsReward = () => {
-    // Count of avoided hazards
-    const avoidedCount = encounteredHazards.length;
-    // Count of damage types selected to avoid
-    const selectedAvoidTypesCount = Object.values(avoidTypes).filter(Boolean).length;
-    
-    // Production-grade formula: Base 15 SP + 45 SP per avoided hazard + 8 SP per selected defense
-    let points = 15 + (avoidedCount * 45) + (selectedAvoidTypesCount * 8);
-    
-    if (avoidedCount === 0) {
-      points = 10 + (selectedAvoidTypesCount * 5);
-    }
-    
-    // Clamp reward strictly between 5 SP and 200 SP as requested
-    return Math.min(200, Math.max(5, Math.round(points)));
-  };
-
   const handleStartRide = () => {
     if (!endPoint) {
       speakText("Please set a destination before starting navigation.");
@@ -941,8 +929,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
 
     setNavIndex(0);
     setRideCompleted(false);
-    setRideXP(0);
-    setRideSP(0);
     
     // Initialize navigation position at current start position
     setNavCurrentPos([playerPos.lat, playerPos.lng]);
@@ -968,10 +954,8 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
   };
 
   const handleClaimSPReward = () => {
-    speakText(`Congratulations! You have claimed ${rideSP} Scout Points.`);
+    speakText("Ride completed. Thank you for riding safely!");
     setRideCompleted(false);
-    setRideXP(0);
-    setRideSP(0);
     
     if (originalStartPoint) {
       setStartPoint(originalStartPoint);
@@ -1137,7 +1121,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
               )}
               <Navigation className={`w-5 h-5 animate-pulse ${isDark ? "text-yellow-400" : "text-[#006a65]"}`} />
               <h2 className={`font-display text-xs font-black uppercase tracking-wider ${isDark ? "text-yellow-400" : "text-[#006a65]"}`}>
-                Safe Navigation Maps
+                {t.map.title}
               </h2>
             </div>
             
@@ -1179,7 +1163,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
           <div className="space-y-3.5 relative">
             {/* Start Location Input */}
             <div className="space-y-1 relative">
-              <span className={`text-[9px] uppercase font-bold tracking-wider block ml-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Start Location</span>
+              <span className={`text-[9px] uppercase font-bold tracking-wider block ml-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>{t.map.startLocation}</span>
               <div className={`flex items-center gap-2 border rounded-xl px-3 py-2 transition-all ${
                 clickMode === "start" 
                   ? "border-emerald-500 ring-2 ring-emerald-500/20" 
@@ -1188,7 +1172,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
                 <input
                   type="text"
-                  placeholder={clickMode === "start" ? "🟢 Tap on map to set start..." : "Type start location..."}
+                  placeholder={clickMode === "start" ? t.map.tapStart : t.map.typeStart}
                   className={`bg-transparent text-xs font-bold focus:outline-none flex-1 truncate ${
                     isDark ? "text-white placeholder-zinc-500" : "text-zinc-800 placeholder-zinc-400"
                   }`}
@@ -1259,7 +1243,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
 
             {/* End Destination Input */}
             <div className="space-y-1 relative">
-              <span className={`text-[9px] uppercase font-bold tracking-wider block ml-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Destination</span>
+              <span className={`text-[9px] uppercase font-bold tracking-wider block ml-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>{t.map.destination}</span>
               <div className={`flex items-center gap-2 border rounded-xl px-3 py-2 transition-all ${
                 clickMode === "end" 
                   ? "border-red-500 ring-2 ring-red-500/20" 
@@ -1268,7 +1252,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                 <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
                 <input
                   type="text"
-                  placeholder={clickMode === "end" ? "🔴 Tap on map to set destination..." : "Type destination..."}
+                  placeholder={clickMode === "end" ? t.map.tapEnd : t.map.typeEnd}
                   className={`bg-transparent text-xs font-bold focus:outline-none flex-1 truncate ${
                     isDark ? "text-white placeholder-zinc-500" : "text-zinc-800 placeholder-zinc-400"
                   }`}
@@ -1327,23 +1311,25 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
         {!clickMode && (
           <motion.div 
             drag="y"
-            dragConstraints={{ top: 0, bottom: 300 }}
+            dragConstraints={{ top: -220, bottom: 350 }}
             dragElastic={0.2}
             className="pointer-events-auto absolute md:relative bottom-[72px] md:bottom-0 left-0 right-0 z-10 bg-white rounded-t-3xl md:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.15)] md:shadow-none md:flex-1 flex flex-col md:h-full w-full md:w-auto flex-shrink-0 touch-none md:touch-pan-x"
           >
-              {/* Drag Handle purely visual on mobile to indicate it overlaps */}
-              <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 w-full flex justify-center pt-3 pb-2 md:hidden flex-shrink-0 cursor-grab active:cursor-grabbing">
+              {/* Drag Handle: Touches here drag the entire sheet */}
+              <div 
+                className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 w-full flex justify-center pt-3 pb-2 md:hidden flex-shrink-0 cursor-grab active:cursor-grabbing touch-none select-none"
+              >
                 <div className="w-12 h-1.5 bg-zinc-300 rounded-full" />
               </div>
               
-              {/* Inner Content scrollable */}
-              <div className="overflow-y-auto custom-scrollbar flex-1 pb-4 md:pb-0 max-h-[60vh] md:max-h-none touch-none md:touch-auto">
+              {/* Inner Content: Draggable via parent, no internal scroll */}
+              <div className="overflow-y-auto custom-scrollbar flex-1 pb-16 md:pb-0 max-h-[70vh] md:max-h-none touch-none md:touch-auto">
 
               {/* Avoidance Checklist */}
             <div className="p-4 bg-zinc-50 border-b border-[#d2c5ae]/20">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] uppercase font-black text-zinc-500 tracking-wider">
-                  🛡️ Avoidance Controls
+                  {t.map.avoidanceControls}
                 </span>
                 <label className="relative inline-flex items-center cursor-pointer select-none">
                   <input 
@@ -1353,18 +1339,18 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                     className="sr-only peer" 
                   />
                   <div className="w-8 h-4.5 bg-zinc-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#006a65]"></div>
-                  <span className="ml-2 text-[10px] font-bold text-zinc-650">Bypass Route</span>
+                  <span className="ml-2 text-[10px] font-bold text-zinc-650">{t.map.bypassRoute}</span>
                 </label>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 mb-3">
                 {Object.keys(avoidTypes).map((typeKey) => {
                   const type = typeKey as DamageType;
                   if (type === DamageType.OTHER || type === DamageType.CRACK || type === DamageType.BROKEN_INFRASTRUCTURE) return null;
                   
                   const isSelected = avoidTypes[type];
-                  const label = type.replace("_", " ");
-                  const activeCount = cases.filter(c => c.status !== "resolved" && c.damageType === type).length;
+                  const label = getTranslatedDamageType(type, t);
+                  const activeCount = cases.filter(c => c.status !== "resolved" && c.damageType === type && (c.severity || 5) >= minSeverity).length;
 
                   return (
                     <button
@@ -1387,20 +1373,69 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                   );
                 })}
               </div>
+
+              {/* Min Damage Severity Selector */}
+              <div className="pt-2.5 border-t border-zinc-200/60 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider flex items-center gap-1">
+                    {t.map.minSeverityThreshold} <span className="text-[#006a65] font-black">{minSeverity}/10</span>
+                  </span>
+                  <span className="text-[9px] text-zinc-500 font-bold">
+                    {minSeverity <= 3 ? t.map.allSeverities : minSeverity <= 6 ? t.map.modAbove : minSeverity <= 8 ? t.map.severeOnly : t.map.criticalOnly}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="10" 
+                    value={minSeverity} 
+                    onChange={(e) => setMinSeverity(Number(e.target.value))}
+                    className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#006a65]"
+                  />
+                </div>
+                <div className="grid grid-cols-4 gap-1 mt-0.5">
+                  {[
+                    { lvl: 1, label: t.map.allSeverities },
+                    { lvl: 4, label: t.map.modAbove },
+                    { lvl: 7, label: t.map.severeOnly },
+                    { lvl: 9, label: t.map.criticalOnly }
+                  ].map(({ lvl, label }) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setMinSeverity(lvl)}
+                      className={`py-1 px-1.5 rounded-lg text-[9px] font-bold text-center transition-all cursor-pointer border ${
+                        minSeverity === lvl 
+                          ? "bg-[#006a65] text-white border-transparent shadow-sm" 
+                          : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Ride Completed Success Reward Card */}
+            {/* Ride Completed Success Card */}
             {rideCompleted && (
-              <div className="m-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center space-y-2.5">
-                <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <Trophy className="w-6 h-6 text-white animate-bounce" />
+              <div className="m-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-2.5">
+                <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-amber-950">Scratch Card Reward Issued!</h3>
-                  <p className="text-[11px] text-amber-700 font-medium mt-1">
-                    Please scratch and claim your Scout Points (SP) to continue.
+                  <h3 className="text-sm font-black text-emerald-950">Ride Completed!</h3>
+                  <p className="text-[11px] text-emerald-700 font-medium mt-1">
+                    You have arrived at your destination safely.
                   </p>
                 </div>
+                <button
+                  onClick={handleClaimSPReward}
+                  className="mt-2 px-5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all cursor-pointer"
+                >
+                  Continue
+                </button>
               </div>
             )}
 
@@ -1409,7 +1444,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
               <div className="p-4 flex-1 space-y-4">
                 {/* Back / Clear Route row */}
                 <div className="flex justify-between items-center bg-zinc-50 border border-zinc-200/60 p-2.5 rounded-xl">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Route Active</span>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t.map.routeActive}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1422,14 +1457,14 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                     className="flex items-center gap-1 text-xs font-black text-[#006a65] hover:text-[#004d4a] transition-colors cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
-                    Change Destination
+                    {t.map.changeDestination}
                   </button>
                 </div>
                 {loadingRoute ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                     <RefreshCw className="w-8 h-8 text-[#006a65] animate-spin" />
-                    <p className="text-xs text-zinc-700 font-bold">Calculating optimal safe route...</p>
-                    <p className="text-[10px] text-zinc-500">Querying real-road Indian OSRM network...</p>
+                    <p className="text-xs text-zinc-700 font-bold">{t.map.calculatingRoute}</p>
+                    <p className="text-[10px] text-zinc-500">{t.map.queryingOSRM}</p>
                   </div>
                 ) : routingError ? (
                   <div className="bg-red-50 border border-red-200 p-4 rounded-2xl text-center space-y-3 shadow-sm">
@@ -1437,7 +1472,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                       <AlertCircle className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-red-950 uppercase tracking-wider">Routing Unavailable</h4>
+                      <h4 className="text-xs font-black text-red-950 uppercase tracking-wider">{t.map.retryRouting}</h4>
                       <p className="text-[11px] text-red-700 font-semibold mt-1">
                         {routingError}
                       </p>
@@ -1452,15 +1487,15 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                       }}
                       className="px-4 py-2 bg-[#006a65] hover:bg-[#00524e] text-white text-xs font-black rounded-xl shadow-md transition-colors uppercase inline-block cursor-pointer"
                     >
-                      Retry Routing
+                      {t.map.retryRouting}
                     </button>
                   </div>
                 ) : currentPath.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                     <AlertTriangle className="w-8 h-8 text-amber-500 animate-pulse" />
-                    <p className="text-xs text-zinc-700 font-bold">No road-legal path found</p>
+                    <p className="text-xs text-zinc-700 font-bold">{t.map.noRoadPath}</p>
                     <p className="text-[10px] text-zinc-500 leading-relaxed">
-                      We couldn't connect your starting location and destination. Try picking adjacent on-road nodes or manual points!
+                      {t.map.noPathDesc}
                     </p>
                   </div>
                 ) : (
@@ -1473,7 +1508,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                         </div>
                         <div>
                           <h4 className="text-[10px] font-black text-[#775a00] uppercase tracking-wider">
-                            {(avoidanceEnabled && routingPreference === "safest" && originalHazards.length > 0) ? "Smart Bypass Path" : "Standard Route"}
+                            {(avoidanceEnabled && routingPreference === "safest" && originalHazards.length > 0) ? t.map.smartBypassPath : t.map.standardRoute}
                           </h4>
                           <div className="flex items-baseline gap-1 mt-0.5">
                             <span className="text-xl font-black leading-none">{stats.time}</span>
@@ -1483,14 +1518,14 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                       </div>
 
                       <div className="text-right">
-                        <span className="text-[10px] font-bold text-zinc-400 block uppercase">Distance</span>
+                        <span className="text-[10px] font-bold text-zinc-400 block uppercase">{t.map.distance}</span>
                         <span className="text-xs font-black text-zinc-700">
                           {(stats.distance / 1000).toFixed(2)} km
                         </span>
                       </div>
 
                       <div className="text-right border-l pl-3 border-zinc-200">
-                        <span className="text-[10px] font-bold text-zinc-400 block uppercase">Safety Index</span>
+                        <span className="text-[10px] font-bold text-zinc-400 block uppercase">{t.map.safetyIndex}</span>
                         <span className={`text-xs font-black px-1.5 py-0.5 rounded ${
                           stats.safetyIndex >= 80 ? "text-emerald-600 bg-emerald-50" : "text-amber-600 bg-amber-50"
                         }`}>
@@ -1506,9 +1541,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                           <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-start gap-2 text-[11px] text-amber-800">
                             <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                             <div>
-                              <p className="font-bold">No completely safe route found.</p>
+                              <p className="font-bold">{t.map.noSafeRouteFound}</p>
                               <p className="text-[10px] text-amber-600/90 mt-0.5">
-                                The safest available route still passes near {encounteredHazards.length} hazard{encounteredHazards.length !== 1 ? 's' : ''}.
+                                {t.map.safestPassesNear.replace("{count}", String(encounteredHazards.length))}
                               </p>
                             </div>
                           </div>
@@ -1516,9 +1551,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-start gap-2 text-[11px] text-emerald-800">
                             <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                             <div>
-                              <p className="font-bold">Avoided {originalHazards.length} Hazard Zone{originalHazards.length !== 1 ? 's' : ''}</p>
+                              <p className="font-bold">{t.map.avoidedHazards.replace("{count}", String(originalHazards.length))}</p>
                               <p className="text-[10px] text-emerald-600/90 mt-0.5">
-                                Road-legal dynamic routing bypassed high-risk potholes and street damages!
+                                {t.map.bypassedDesc}
                               </p>
                             </div>
                           </div>
@@ -1529,7 +1564,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                     {/* ROUTING PREFERENCE SELECTOR */}
                     <div className="space-y-1">
                       <span className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block">
-                        Routing Preference
+                        {t.map.routingPreference}
                       </span>
                       <div className="bg-zinc-100 border border-zinc-200 p-1 rounded-2xl flex gap-1">
                         <button
@@ -1542,7 +1577,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                           }`}
                         >
                           <Zap className="w-3.5 h-3.5" />
-                          Fastest Route
+                          {t.map.fastestRoute}
                         </button>
                         <button
                           type="button"
@@ -1554,21 +1589,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                           }`}
                         >
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          Safest Route
+                          {t.map.safestRoute}
                         </button>
                       </div>
-                    </div>
-
-                    {/* START RIDE FOR ON-ROAD GUIDANCE */}
-                    <div className="space-y-2">
-                      <button
-                        onClick={handleStartRide}
-                        className="w-full bg-[#f0c040] hover:bg-[#e0b030] text-[#251a00] font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2.5 shadow-md shadow-[#775a00]/10 hover:scale-[1.02] active:scale-98 transition-all cursor-pointer"
-                      >
-                        <Play className="w-4 h-4 fill-current text-[#251a00]" />
-                        START NAVIGATING
-                      </button>
-                      <p className="text-[10px] text-center text-zinc-400 font-medium">Navigation will start from your current GPS location only.</p>
                     </div>
                   </>
                 )}
@@ -1579,9 +1602,9 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                   <Search className="w-6 h-6 text-zinc-400" />
                 </div>
                 <div>
-                  <p className="font-bold text-xs text-zinc-700">No active route selected</p>
+                  <p className="font-bold text-xs text-zinc-700">{t.map.noActiveRoute}</p>
                   <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-                    Set a route by choosing start and destination points. Type in address fields to search, or tap on the map to pinpoint locations manually!
+                    {t.map.noActiveRouteDesc}
                   </p>
                 </div>
               </div>
@@ -1939,6 +1962,7 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
                   if (onTriggerScan) {
                     onTriggerScan();
                   }
+                  navigate("/scan-result");
                 }}
                 className="w-10 h-10 rounded-full bg-yellow-400 hover:bg-yellow-350 active:scale-95 text-black border border-zinc-900 shadow-lg flex items-center justify-center transition-all hover:scale-105 cursor-pointer relative"
                 title="Report Road Hazard"
@@ -1986,13 +2010,6 @@ function RoutePlannerView({ cases, playerPos, setPlayerPos, onTriggerScan }: Rou
         )}
 
       </div>
-
-      {rideCompleted && (
-        <SafeRideScratchCard 
-          spEarned={rideSP} 
-          onClaim={handleClaimSPReward} 
-        />
-      )}
     </div>
   );
 }
@@ -2063,261 +2080,5 @@ export default function RoutePlannerErrorBoundaryWrapper(props: RoutePlannerView
     <RoutePlannerErrorBoundary>
       <RoutePlannerView {...props} />
     </RoutePlannerErrorBoundary>
-  );
-}
-
-interface SafeRideScratchCardProps {
-  spEarned: number;
-  onClaim: () => void;
-}
-
-function SafeRideScratchCard({ spEarned, onClaim }: SafeRideScratchCardProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const isDrawingRef = useRef(false);
-  const [scratched, setScratched] = useState(false);
-  const [scratchPercent, setScratchPercent] = useState(0);
-
-  useEffect(() => {
-    initCanvas();
-  }, []);
-
-  const initCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // Clear and draw background coating
-    ctx.clearRect(0, 0, width, height);
-    
-    // Create high-tech metallic silver gradient
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#cbd5e1");
-    gradient.addColorStop(0.3, "#f1f5f9");
-    gradient.addColorStop(0.7, "#94a3b8");
-    gradient.addColorStop(1, "#64748b");
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw some stylized holographic/shimmer patterns
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 12; i++) {
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * width, 0);
-      ctx.lineTo(Math.random() * width, height);
-      ctx.stroke();
-    }
-
-    // Border pattern
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(6, 6, width - 12, height - 12);
-
-    // Stamp pattern
-    ctx.fillStyle = "#0f172a";
-    ctx.font = "900 13px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("MUNICIPAL REWARD", width / 2, height / 2 - 25);
-    
-    ctx.fillStyle = "#006a65";
-    ctx.font = "900 16px 'Space Grotesk', sans-serif";
-    ctx.fillText("★ SCRATCH TO REVEAL ★", width / 2, height / 2);
-
-    ctx.fillStyle = "#64748b";
-    ctx.font = "500 11px 'Inter', sans-serif";
-    ctx.fillText("USE CURSOR OR FINGER", width / 2, height / 2 + 25);
-  };
-
-  const getPosition = (e: any) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
-    };
-  };
-
-  const startScratching = (e: any) => {
-    isDrawingRef.current = true;
-    scratch(e);
-  };
-
-  const stopScratching = () => {
-    isDrawingRef.current = false;
-    calculateScratchPercentage();
-  };
-
-  const scratch = (e: any) => {
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const pos = getPosition(e);
-
-    // Set composite operation to erase
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 24, 0, Math.PI * 2);
-    ctx.fill();
-  };
-
-  const calculateScratchPercentage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || scratched) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const pixels = imgData.data;
-    let transparent = 0;
-
-    // Fast-sample pixel alpha channel to determine scratch percentage
-    for (let i = 3; i < pixels.length; i += 4 * 16) {
-      if (pixels[i] === 0) {
-        transparent++;
-      }
-    }
-
-    const totalSampled = pixels.length / (4 * 16);
-    const percent = Math.floor((transparent / totalSampled) * 100);
-    setScratchPercent(percent);
-
-    if (percent > 40) {
-      setScratched(true);
-      // Erase fully
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fillRect(0, 0, width, height);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-zinc-950/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center border border-zinc-100 text-center relative overflow-hidden font-sans">
-        
-        {/* Confetti/Sparkles background */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/5 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#006a65]/5 rounded-full blur-2xl pointer-events-none" />
-
-        {/* Heading */}
-        <div className="mb-5">
-          <div className="w-12 h-12 rounded-full bg-yellow-100/80 flex items-center justify-center text-yellow-600 mx-auto mb-3 animate-pulse">
-            <Trophy className="w-6 h-6" />
-          </div>
-          <span className="text-[10px] uppercase font-black text-[#006a65] tracking-widest bg-[#006a65]/10 px-3 py-1 rounded-full">
-            Active Scout Bonus
-          </span>
-          <h3 className="text-xl font-black text-zinc-900 mt-2.5">
-            Safe Ride Completed!
-          </h3>
-          <p className="text-xs text-zinc-500 mt-1">
-            Scratch below to claim your safe-travel reward.
-          </p>
-        </div>
-
-        {/* Scratchable Stage */}
-        <div className="relative w-64 h-64 rounded-2xl overflow-hidden shadow-inner border-2 border-zinc-100 bg-[#FAF7F2] flex flex-col justify-between p-5 items-center">
-          
-          {/* Underlay */}
-          <div className="absolute inset-0 flex flex-col justify-between p-5 items-center text-center">
-            <div className="flex flex-col items-center justify-center flex-1 space-y-3">
-              <div className="w-16 h-16 bg-emerald-50 rounded-full border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm animate-bounce">
-                <Sparkles className="w-9 h-9" />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">REVEALED REWARD</p>
-                <div className="text-[34px] font-black text-emerald-600 tracking-tight leading-none mt-1">
-                  +{spEarned} SP
-                </div>
-                <p className="text-[10px] font-semibold text-zinc-500 mt-1">Scout Points / Safety Points</p>
-              </div>
-            </div>
-
-            <button
-              onClick={onClaim}
-              className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 ${
-                scratched 
-                  ? "bg-[#006a65] text-white hover:bg-[#00524e] active:scale-98" 
-                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-              }`}
-              disabled={!scratched}
-            >
-              <Check className="w-4 h-4" />
-              Claim Scout Points
-            </button>
-          </div>
-
-          {/* Canvas Overlay Coating */}
-          <canvas
-            ref={canvasRef}
-            width={256}
-            height={256}
-            onMouseDown={startScratching}
-            onMouseMove={scratch}
-            onMouseUp={stopScratching}
-            onMouseLeave={stopScratching}
-            onTouchStart={startScratching}
-            onTouchMove={scratch}
-            onTouchEnd={stopScratching}
-            className={`absolute top-0 left-0 cursor-crosshair transition-opacity duration-300 z-10 ${
-              scratched ? "opacity-0 pointer-events-none" : "opacity-100"
-            }`}
-          />
-        </div>
-
-        {/* Status indicator */}
-        <div className="mt-4 w-full text-xs">
-          {!scratched ? (
-            <div className="flex justify-between items-center text-zinc-400 font-medium px-1">
-              <span>Scratched area:</span>
-              <span className="font-mono">{scratchPercent}%</span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-1 text-emerald-600 font-black tracking-wider uppercase animate-pulse">
-              <Check className="w-4 h-4" />
-              Reward Unlocked!
-            </div>
-          )}
-        </div>
-
-        {/* Fallback option */}
-        {!scratched && (
-          <button
-            type="button"
-            onClick={() => {
-              setScratched(true);
-              setScratchPercent(100);
-              const canvas = canvasRef.current;
-              if (canvas) {
-                const ctx = canvas.getContext("2d");
-                if (ctx) {
-                  ctx.globalCompositeOperation = "destination-out";
-                  ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-              }
-            }}
-            className="mt-3 text-[10px] text-zinc-400 hover:text-[#006a65] underline font-medium cursor-pointer animate-pulse"
-          >
-            Can't scratch? Click to auto-reveal
-          </button>
-        )}
-      </div>
-    </div>
   );
 }

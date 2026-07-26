@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { User, ShieldCheck, Award, Zap, CheckCircle2, AlertTriangle, ChevronRight, RefreshCw, Brain, Cpu, Sparkles, Camera } from "lucide-react";
+import { User, ShieldCheck, Award, Zap, AlertTriangle, ChevronRight, RefreshCw, Brain, Cpu, Camera } from "lucide-react";
 import { UserProfile, Case } from "../../lib/constants";
 import { getRankInfo } from "../../lib/xp";
 import { auth, db } from "../../firebase";
-import { doc, getDoc, collection, query, where, orderBy, limit, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useLanguage } from "../../context/LanguageContext";
+import { getTranslatedRank, getTranslatedStatus, getTranslatedDamageType } from "../../lib/i18nHelpers";
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 interface PresetAvatar {
@@ -241,20 +243,17 @@ interface ProfileViewProps {
   user: UserProfile;
   cases: Case[];
   onReset: () => void;
-  onScratchSavedCard?: (reward: any) => void;
 }
 
 export default function ProfileView({ 
   user, 
   cases: propCases, 
-  onReset,
-  onScratchSavedCard
+  onReset
 }: ProfileViewProps) {
+  const { t } = useLanguage();
   const [resetting, setResetting] = useState(false);
   const [memberSince, setMemberSince] = useState('');
   const [userCases, setUserCases] = useState<any[]>([]);
-  const [rewards, setRewards] = useState<any[]>([]);
-  const [rewardTab, setRewardTab] = useState<'unscratched' | 'active' | 'history'>('unscratched');
   
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -365,19 +364,8 @@ export default function ProfileView({
       setUserCases(rpts.slice(0, 10));
     });
 
-    const rewardsQuery = query(
-      collection(db, 'users', uid, 'rewards'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubRewards = onSnapshot(rewardsQuery, (snapshot) => {
-      const rwds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setRewards(rwds);
-    });
-
     return () => {
       unsubCases();
-      unsubRewards();
     };
   }, []);
 
@@ -405,31 +393,8 @@ export default function ProfileView({
     }
   };
 
-  const handleMarkUsed = async (rewardId: string) => {
-    if (!auth.currentUser) return;
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'rewards', rewardId), {
-      couponRedeemed: true
-    });
-  };
-
-  const handleScratch = async (rewardId: string) => {
-    const targetReward = rewards.find(r => r.id === rewardId);
-    if (targetReward && onScratchSavedCard) {
-      onScratchSavedCard(targetReward);
-    } else {
-      if (!auth.currentUser) return;
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'rewards', rewardId), {
-        scratched: true
-      });
-    }
-  };
-
-  const unscratched = rewards.filter(r => !r.scratched);
-  const activeCoupons = rewards.filter(r => r.scratched && r.coupon && !r.couponRedeemed);
-  const history = rewards.filter(r => r.scratched && (r.couponRedeemed || !r.coupon));
-
   return (
-    <div className="bg-[#F5F0E8] min-h-[100dvh] text-[#191c22] font-sans pt-20 pb-36 px-6 max-w-lg mx-auto space-y-6">
+    <div className="space-y-3 w-full">
       
       {/* Profile Header Block */}
       <section className="flex flex-col items-center text-center bg-white p-6 rounded-3xl border border-[#d2c5ae]/30 shadow-sm relative overflow-hidden">
@@ -450,53 +415,53 @@ export default function ProfileView({
           <div className="flex items-center gap-1.5 flex-wrap justify-center mt-1">
             {user.isAdmin && (
               <span className="text-[10px] bg-red-100 text-red-700 border border-red-200 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                ADMIN
+                {t.profile.adminBadge}
               </span>
             )}
             <span className="text-xs bg-[#006a65]/10 text-[#006a65] border border-[#006a65]/20 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-              {user.rank}
+              {getTranslatedRank(user.rank, t)}
             </span>
           </div>
         </h2>
-        <p className="text-xs text-zinc-400 font-medium mt-1">Member since {memberSince}</p>
+        <p className="text-xs text-zinc-400 font-medium mt-1">{t.profile.memberSince.replace("{date}", memberSince)}</p>
 
         <div 
           onClick={() => setShowLevelsPopup(!showLevelsPopup)}
           className="mt-4 flex flex-col items-center gap-1.5 bg-[#F5F0E8] px-4 py-2.5 rounded-xl border border-zinc-200 cursor-pointer hover:bg-zinc-200/50 active:scale-[0.99] transition-all w-full max-w-[240px]"
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-[#775a00] font-mono">LVL {level}</span>
+            <span className="text-xs font-black text-[#775a00] font-mono">{t.profile.level.replace("{level}", String(level))}</span>
             <div className="w-24 h-2.5 bg-zinc-200 rounded-full overflow-hidden">
               <div className="h-full bg-[#f0c040] rounded-full" style={{ width: `${Math.min(100, progressPercent)}%` }} />
             </div>
           </div>
           <div className="text-[10px] font-black text-[#006a65] font-mono flex items-center gap-1 select-none">
-            <span>🛡️ Civic Trust:</span>
+            <span>{t.profile.civicTrust}</span>
             <span>{Math.min(100, user.trustScore)}%</span>
           </div>
           <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">
-            {rankInfo.xpNeeded.toLocaleString()} XP to reach {rankInfo.nextRank || "Legend"}
+            {t.profile.xpToNext.replace("{xp}", rankInfo.xpNeeded.toLocaleString()).replace("{rank}", getTranslatedRank(rankInfo.nextRank || "Legend", t))}
           </div>
         </div>
 
         {showLevelsPopup && (
           <div className="mt-3.5 p-3.5 bg-[#F5F0E8] border border-zinc-200 rounded-2xl space-y-2 animate-in fade-in slide-in-from-top-2 duration-150 w-full text-left">
             <div className="font-extrabold text-[#775a00] uppercase text-[8px] tracking-wider mb-1">
-              Upcoming Scout Ranks
+              {t.profile.upcomingRanks}
             </div>
             {next1 && (
               <div className="flex justify-between items-center text-zinc-750 font-bold text-xs">
-                <span className="flex items-center gap-1.5">🎯 {next1.rank}</span>
+                <span className="flex items-center gap-1.5">🎯 {getTranslatedRank(next1.rank, t)}</span>
                 <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-zinc-200">{next1.minXp} XP</span>
               </div>
             )}
             {next2 ? (
               <div className="flex justify-between items-center text-zinc-400 font-semibold text-xs border-t border-zinc-200 pt-2 mt-2">
-                <span className="flex items-center gap-1.5">🔒 {next2.rank}</span>
+                <span className="flex items-center gap-1.5">🔒 {getTranslatedRank(next2.rank, t)}</span>
                 <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-zinc-200">🔒 {next2.minXp} XP</span>
               </div>
             ) : (
-              <div className="text-[9px] text-zinc-400 italic">No further ranks after this.</div>
+              <div className="text-[9px] text-zinc-400 italic">{t.profile.noFurtherRanks}</div>
             )}
           </div>
         )}
@@ -504,11 +469,11 @@ export default function ProfileView({
 
         {showAvatarSelector && (
           <div className="mt-6 p-4 bg-[#F5F0E8] rounded-2xl border border-zinc-150 w-full text-left space-y-4 animate-in slide-in-from-top-4 duration-250">
-            <p className="text-xs font-black text-[#006a65] uppercase tracking-wider">Choose a Preset Avatar</p>
+            <p className="text-xs font-black text-[#006a65] uppercase tracking-wider">{t.avatar.choosePreset}</p>
             
             {/* Age Category Selector */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Age Group</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">{t.avatar.ageGroup}</span>
               <div className="grid grid-cols-3 gap-1 bg-zinc-200/50 p-1 rounded-xl">
                 {(["kids", "teens", "adults"] as const).map((cat) => (
                   <button
@@ -523,7 +488,7 @@ export default function ProfileView({
                         : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50"
                     }`}
                   >
-                    {cat === "kids" ? "👶 Kids" : cat === "teens" ? "🧑 Teens" : "👨 Adults"}
+                    {cat === "kids" ? t.avatar.kids : cat === "teens" ? t.avatar.teens : t.avatar.adults}
                   </button>
                 ))}
               </div>
@@ -534,7 +499,7 @@ export default function ProfileView({
               {/* Girls / Women Section */}
               <div className="space-y-1">
                 <span className="text-[9px] font-black text-zinc-500 uppercase tracking-wider block">
-                  {selectedAgeCategory === "adults" ? "👩 Women" : "👧 Girls"}
+                  {selectedAgeCategory === "adults" ? t.avatar.women : t.avatar.girls}
                 </span>
                 <div className="grid grid-cols-4 gap-2.5 p-2 bg-white/40 rounded-xl border border-zinc-200/40">
                   {PRESET_AVATARS.filter(av => av.category === selectedAgeCategory && av.gender === "girl").map((av, i) => (
@@ -557,7 +522,7 @@ export default function ProfileView({
               {/* Boys / Men Section */}
               <div className="space-y-1">
                 <span className="text-[9px] font-black text-zinc-500 uppercase tracking-wider block">
-                  {selectedAgeCategory === "adults" ? "👨 Men" : "👦 Boys"}
+                  {selectedAgeCategory === "adults" ? t.avatar.men : t.avatar.boys}
                 </span>
                 <div className="grid grid-cols-4 gap-2.5 p-2 bg-white/40 rounded-xl border border-zinc-200/40">
                   {PRESET_AVATARS.filter(av => av.category === selectedAgeCategory && av.gender === "boy").map((av, i) => (
@@ -580,7 +545,7 @@ export default function ProfileView({
 
             <div className="relative flex items-center py-1">
               <div className="flex-grow border-t border-zinc-200"></div>
-              <span className="flex-shrink-0 mx-2 text-zinc-400 text-[10px] font-bold uppercase">Or</span>
+              <span className="flex-shrink-0 mx-2 text-zinc-400 text-[10px] font-bold uppercase">{t.common.or}</span>
               <div className="flex-grow border-t border-zinc-200"></div>
             </div>
 
@@ -601,7 +566,7 @@ export default function ProfileView({
                 {uploadingAvatar ? (
                   <div className="w-4 h-4 border-2 border-[#006a65]/30 border-t-[#006a65] rounded-full animate-spin" />
                 ) : (
-                  <>📷 Choose from Gallery</>
+                  <>{t.avatar.chooseFromGallery}</>
                 )}
               </button>
             </div>
@@ -613,116 +578,37 @@ export default function ProfileView({
       <section className="grid grid-cols-2 gap-4">
         {/* Stat 1 */}
         <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-[#775a00] flex flex-col justify-between min-h-[110px] col-span-2">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total XP</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">{t.profile.totalXp}</span>
           <div>
             <p className="text-2xl font-black text-zinc-900 tracking-tight font-mono">{user.xp.toLocaleString()}</p>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">POINTS</p>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">{t.profile.points}</p>
           </div>
         </div>
 
         {/* Stat 3 */}
         <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-amber-500 flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Reports filed</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">{t.profile.reportsFiled}</span>
           <div>
             <p className="text-2xl font-black text-zinc-900 tracking-tight font-mono">{user.totalReports || 0}</p>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">SUBMISSIONS</p>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">{t.profile.submissions}</p>
           </div>
         </div>
 
         {/* Stat 4 */}
         <div className="bg-white p-5 rounded-3xl border border-[#d2c5ae]/30 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Resolves</span>
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">{t.profile.resolvesCount}</span>
           <div>
             <p className="text-2xl font-black text-zinc-900 tracking-tight font-mono">{user.totalResolves || 0}</p>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">CONFIRMED REPAIRS</p>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">{t.profile.confirmedRepairs}</p>
           </div>
         </div>
       </section>
 
 
-      {/* My Rewards & Coupons */}
-      <section className="bg-white p-6 rounded-3xl border border-[#d2c5ae]/30 shadow-sm space-y-4">
-        <h3 className="font-display text-lg font-bold text-zinc-900 border-b pb-2 uppercase">
-          MY REWARDS & COUPONS
-        </h3>
-        
-        <div className="flex overflow-x-auto custom-scrollbar gap-2 pb-2">
-          <button 
-            onClick={() => setRewardTab('unscratched')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${rewardTab === 'unscratched' ? 'bg-[#006a65] text-white' : 'bg-zinc-100 text-zinc-500'}`}
-          >
-            Unscratched ({unscratched.length})
-          </button>
-          <button 
-            onClick={() => setRewardTab('active')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${rewardTab === 'active' ? 'bg-[#f0c040] text-[#775a00]' : 'bg-zinc-100 text-zinc-500'}`}
-          >
-            Active Coupons ({activeCoupons.length})
-          </button>
-          <button 
-            onClick={() => setRewardTab('history')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${rewardTab === 'history' ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-zinc-500'}`}
-          >
-            History ({history.length})
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {rewardTab === 'unscratched' && (
-            unscratched.length > 0 ? unscratched.map(r => (
-              <div key={r.id} onClick={() => handleScratch(r.id)} className="cursor-pointer bg-gradient-to-r from-zinc-800 to-zinc-900 p-4 rounded-2xl flex justify-between items-center border border-zinc-700 text-white shadow-sm hover:scale-[1.02] transition-transform">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-wider">{r.tier} REWARD</p>
-                  <p className="text-[10px] text-zinc-400 mt-1">Tap to scratch and reveal</p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-zinc-700/50 flex justify-center items-center">
-                  <Sparkles className="w-5 h-5 text-yellow-400" />
-                </div>
-              </div>
-            )) : <p className="text-xs text-zinc-400 text-center py-4">No unscratched cards.</p>
-          )}
-
-          {rewardTab === 'active' && (
-            activeCoupons.length > 0 ? activeCoupons.map(r => (
-              <div key={r.id} className="bg-yellow-50 p-4 rounded-2xl flex flex-col gap-3 border border-yellow-200 shadow-sm">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-wider text-[#775a00]">{r.coupon}</p>
-                    <p className="text-[10px] font-bold text-yellow-600 mt-1 uppercase">CODE: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-yellow-200">{r.couponCode}</span></p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => navigator.clipboard.writeText(r.couponCode)} className="flex-1 bg-white border border-yellow-200 text-[#775a00] text-[10px] font-bold py-2 rounded-lg hover:bg-yellow-100">
-                    Copy Code
-                  </button>
-                  <button onClick={() => handleMarkUsed(r.id)} className="flex-1 bg-[#f0c040] text-[#775a00] text-[10px] font-bold py-2 rounded-lg hover:bg-yellow-400">
-                    Mark as Used
-                  </button>
-                </div>
-              </div>
-            )) : <p className="text-xs text-zinc-400 text-center py-4">No active coupons.</p>
-          )}
-
-          {rewardTab === 'history' && (
-            history.length > 0 ? history.map(r => (
-              <div key={r.id} className="bg-zinc-50 p-4 rounded-2xl flex justify-between items-center border border-zinc-150">
-                <div>
-                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                    {r.couponRedeemed ? "REDEEMED COUPON" : "XP REWARD"}
-                  </p>
-                  <p className="text-[10px] text-zinc-400 mt-1">{r.coupon ? r.coupon : `+${r.xpEarned} XP`}</p>
-                </div>
-                {r.couponRedeemed && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
-              </div>
-            )) : <p className="text-xs text-zinc-400 text-center py-4">No history yet.</p>
-          )}
-        </div>
-      </section>
-
       {/* Recent Case Logs */}
       <section className="bg-white p-6 rounded-3xl border border-[#d2c5ae]/30 shadow-sm space-y-4">
         <h3 className="font-display text-lg font-bold text-zinc-900 border-b pb-2 uppercase">
-          RECENT SCRAPPING HISTORY
+          {t.profile.recentHistory}
         </h3>
         <div className="space-y-3">
           {userCases.length > 0 ? userCases.map((c) => (
@@ -739,9 +625,9 @@ export default function ProfileView({
               )}
               <div className="flex-grow min-w-0">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-xs text-zinc-800 capitalize truncate">{(c.damageType || "").replace("_", " ")}</h4>
+                  <h4 className="font-bold text-xs text-zinc-800 capitalize truncate">{getTranslatedDamageType(c.damageType, t)}</h4>
                   <span className={`text-[9px] font-bold uppercase border px-1.5 py-0.5 rounded-full ${getStatusColor(c.status)}`}>
-                    {c.status}
+                    {getTranslatedStatus(c.status, t)}
                   </span>
                 </div>
                 <p className="text-[10px] text-zinc-450 truncate mt-0.5">{c.address}</p>
@@ -749,7 +635,7 @@ export default function ProfileView({
               <ChevronRight className="w-4 h-4 text-zinc-400 flex-shrink-0" />
             </div>
           )) : (
-            <p className="text-xs text-zinc-400 text-center py-2">No reports submitted yet.</p>
+            <p className="text-xs text-zinc-400 text-center py-2">{t.profile.noReportsYet}</p>
           )}
         </div>
       </section>
@@ -760,7 +646,7 @@ export default function ProfileView({
           onClick={handleLogout}
           className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-12 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          LOGOUT
+          {t.profile.logout}
         </button>
         <button
           onClick={handleReset}
@@ -768,10 +654,10 @@ export default function ProfileView({
           className="w-full bg-[#ae2f34] hover:bg-red-750 text-white font-bold text-xs h-12 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 mt-2"
         >
           <RefreshCw className={`w-4 h-4 ${resetting ? "animate-spin" : ""}`} />
-          {resetting ? "Resetting state..." : "RESET PROFILE & RELOAD SEEDS"}
+          {resetting ? t.profile.resettingState : t.profile.resetProfile}
         </button>
         <p className="text-[9px] text-zinc-450 text-center font-medium">
-          Note: This triggers a hard data purge, restoring original Koramangala seed cases and level 12 stats for demo loop.
+          {t.profile.resetNote}
         </p>
       </section>
     </div>

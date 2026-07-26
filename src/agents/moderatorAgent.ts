@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const MODERATOR_SYSTEM_PROMPT = `You are the Civic Succedent AI Chat Moderator (CS-AI).
+const MODERATOR_SYSTEM_PROMPT = `You are the Nagarika AI Chat Moderator (CS-AI).
 Analyze the message sent by a user in our community group chat.
 Determine if this message is ethical, respectful, and civic-focused.
 Unethical behavior includes: hate speech, cyberbullying, severe profanity, illegal activities, spam/marketing, or code injection.
