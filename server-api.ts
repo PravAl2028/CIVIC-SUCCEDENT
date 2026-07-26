@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import path from "path";
 import dotenv from "dotenv";
 import { runScannerAgent } from "./src/agents/scannerAgent.js";
 import { runDispatcherAgent } from "./src/agents/dispatcherAgent.js";
@@ -15,6 +14,10 @@ app.use(cors());
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+app.get("/", (_req, res) => {
+  res.json({ name: "Nagarika API", status: "running", version: "1.0.0" });
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", time: new Date() });
@@ -128,6 +131,13 @@ app.post("/api/agents/moderator", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught Exception:", err);
 });
 
 const PORT = Number(process.env.PORT) || 3001;
